@@ -7,6 +7,7 @@
 </head>
 <body>
     <script src="https://www.puck-js.com/puck.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.0/FileSaver.min.js"></script>
     <h2 style="text-align: center;">Bangle.js data streaming app</h2>
     <main>
         <article>
@@ -81,21 +82,13 @@ Bangle.on('HRM', function(hrm) {
                 console.log(result);
 
                 // Convert collected data to binary
-                let accelData = new Uint8Array(result.accel.length * 13); // Each entry is 13 bytes
-                result.accel.forEach((entry, index) => {
-                    let pos = index * 13;
-                    accelData[pos] = 'A'.charCodeAt(0);
-                    new DataView(accelData.buffer).setUint32(pos + 1, entry.ms, true);
-                    new DataView(accelData.buffer).setInt32(pos + 5, entry.x, true);
-                    new DataView(accelData.buffer).setInt32(pos + 9, entry.y, true);
-                    new DataView(accelData.buffer).setInt32(pos + 13, entry.z, true);
-                });
-
-                let filename = 'testResults_' + Date.now() + '.bin';
-                if (saveToFile(accelData, filename)) {
+                let data = prepareData(result);
+                if (data) {
+                    let filename = 'testResults_' + Date.now() + '.bin';
+                    saveAs(new Blob([data]), filename);
                     console.log('Data saved successfully.');
                 } else {
-                    console.error('Error saving data.');
+                    console.error('Error preparing data for saving.');
                 }
                 return;
             } else {
@@ -178,19 +171,27 @@ Bangle.on('HRM', function(hrm) {
             }
         }
 
-        function saveToFile(data, filename) {
+        function prepareData(result) {
             try {
-                let a = document.createElement('a');
-                a.href = URL.createObjectURL(new Blob([data], {type: 'application/octet-stream'}));
-                a.download = filename;
-                a.style.display = 'none';
-                document.body.appendChild(a);
-                a.click();
-                document.body.removeChild(a);
-                return true;
+                let data = [];
+                result.accel.forEach(entry => {
+                    data.push(entry.ms);
+                    data.push(entry.x);
+                    data.push(entry.y);
+                    data.push(entry.z);
+                });
+                result.steps.forEach(entry => {
+                    data.push(entry.ms);
+                    data.push(entry.steps);
+                });
+                result.hr.forEach(entry => {
+                    data.push(entry.ms);
+                    data.push(entry.hr);
+                });
+                return new Uint32Array(data).buffer;
             } catch (error) {
                 console.error(error);
-                return false;
+                return null;
             }
         }
     </script>
