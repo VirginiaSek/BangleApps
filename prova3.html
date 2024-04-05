@@ -4,10 +4,10 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <link rel="stylesheet" href="https://cdn.rawgit.com/kimeiga/bahunya/css/bahunya-0.1.1.css" />
+    <script src="https://www.puck-js.com/puck.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.0/FileSaver.min.js"></script>
 </head>
 <body>
-    <script src="https://www.puck-js.com/puck.js"></script>
-    <script src="deps/FileSaver.js"></script>
     <h2 style="text-align: center;">Bangle.js data streaming app</h2>
 
     <main>
@@ -27,33 +27,30 @@
         var BANGLE_CODE = `
 var start = Date.now();
 Bangle.on('accel', function(a) {
-    var d = [
-        "A",
-        Date.now() - start,
-        Math.round(a.x * 1000),
-        Math.round(a.y * 1000),
-        Math.round(a.z * 1000)
-    ];
-    Bluetooth.println(d.join(","));
+    var d = new ArrayBuffer(10); // 2 bytes per axis, 3 axes
+    var dv = new DataView(d);
+    dv.setInt16(0, Math.round(a.x * 1000), true); // Little-endian
+    dv.setInt16(2, Math.round(a.y * 1000), true);
+    dv.setInt16(4, Math.round(a.z * 1000), true);
+    dv.setUint32(6, Date.now() - start, true); // Time in milliseconds
+    Bluetooth.write(d);
 });
 
 Bangle.on('step', function(up) {
-    var d = [
-        "S",
-        Date.now() - start,
-        up
-    ];
-    Bluetooth.println(d.join(","));
+    var d = new ArrayBuffer(4); // 2 bytes for step count, 2 bytes for time
+    var dv = new DataView(d);
+    dv.setUint16(0, up, true); // Little-endian
+    dv.setUint16(2, Date.now() - start, true); // Time in milliseconds
+    Bluetooth.write(d);
 });
 
 Bangle.setHRMPower(1);
 Bangle.on('HRM', function(hrm) {
-    var d = [
-        "H",
-        Date.now() - start,
-        hrm.bpm
-    ];
-    Bluetooth.println(d.join(","));
+    var d = new ArrayBuffer(3); // 1 byte for heart rate, 2 bytes for time
+    var dv = new DataView(d);
+    dv.setUint8(0, hrm.bpm);
+    dv.setUint16(1, Date.now() - start, true); // Time in milliseconds
+    Bluetooth.write(d);
 });
 `;
 
@@ -67,15 +64,6 @@ Bangle.on('HRM', function(hrm) {
 
         let result = [];
 
-        // detect file saving capability
-        try {
-            new Blob;
-        } catch (e) {
-            console.error(e);
-            pMain.textContent = 'File saving not supported';
-            btnConnect.disabled = true;
-        }
-
         // When we click the connect button...
         let connection;
         btnConnect.addEventListener("click", function () {
@@ -86,16 +74,11 @@ Bangle.on('HRM', function(hrm) {
                 pMain.textContent = 'Ready to connect';
                 console.log(result);
 
-                // Create a new Uint8Array to store binary data
-                var binaryData = new Uint8Array(result.length);
-                for (var i = 0; i < result.length; i++) {
-                    binaryData[i] = result.charCodeAt(i);
-                }
+                // Create a new Blob object containing the binary data
+                var blob = new Blob(result, { type: "application/octet-stream" });
 
-                // Save binary data as a file
-                var blob = new Blob([binaryData], { type: "application/octet-stream" });
-                let filename = 'testResults_' + Date.now() + '.bin';
-                saveAs(blob, filename);
+                // Save the Blob object as a file
+                saveAs(blob, 'testResults_' + Date.now() + '.bin');
                 return;
             } else {
                 // Connect
@@ -149,7 +132,7 @@ Bangle.on('HRM', function(hrm) {
                     pHeartRate.textContent = d[2];
                 }
                 // Append line to result array for binary saving
-                result.push(line + "\n");
+                result.push(new Uint8Array(line.split(",").map(Number)));
             }
         }
     </script>
