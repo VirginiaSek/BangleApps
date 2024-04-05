@@ -1,4 +1,3 @@
-<!DOCTYPE html>
 <html>
 <head>
     <title>Bangle.js Data streaming</title>
@@ -14,11 +13,7 @@
         <article>
             <p id="pMain">Ready to connect</p>
             <button id="btnConnect">Connect</button>
-            <p>X: <span id="pX"></span> | X Real-time: <span id="pXRealtime"></span></p>
-            <p>Y: <span id="pY"></span> | Y Real-time: <span id="pYRealtime"></span></p>
-            <p>Z: <span id="pZ"></span> | Z Real-time: <span id="pZRealtime"></span></p>
-            <p>Steps: <span id="pSteps"></span> | Steps Real-time: <span id="pStepsRealtime"></span></p>
-            <p>Heart Rate: <span id="pHeartRate"></span> | Heart Rate Real-time: <span id="pHeartRateRealtime"></span></p>
+            <div id="dataHistory"></div>
         </article>
     </main>
     <script>
@@ -57,21 +52,14 @@ Bangle.on('HRM', function(hrm) {
 
         let pMain = document.getElementById("pMain");
         let btnConnect = document.getElementById("btnConnect");
-        let pX = document.getElementById("pX");
-        let pY = document.getElementById("pY");
-        let pZ = document.getElementById("pZ");
-        let pSteps = document.getElementById("pSteps");
-        let pHeartRate = document.getElementById("pHeartRate");
+        let dataHistory = document.getElementById("dataHistory");
 
-        // Real-time data spans
-        let pXRealtime = document.getElementById("pXRealtime");
-        let pYRealtime = document.getElementById("pYRealtime");
-        let pZRealtime = document.getElementById("pZRealtime");
-        let pStepsRealtime = document.getElementById("pStepsRealtime");
-        let pHeartRateRealtime = document.getElementById("pHeartRateRealtime");
-
-        let result = {};
         let connection;
+        let result = {
+            accel: [],
+            steps: [],
+            hr: []
+        };
 
         try {
             new Blob;
@@ -103,11 +91,6 @@ Bangle.on('HRM', function(hrm) {
                     pMain.textContent = 'Connected!';
                     btnConnect.textContent = 'Disconnect';
 
-                    result.startTs = new Date();
-                    result.accel = [];
-                    result.steps = [];
-                    result.hr = [];
-
                     var buf = "";
                     connection.on("data", function (d) {
                         buf += d;
@@ -130,39 +113,45 @@ Bangle.on('HRM', function(hrm) {
 
         function onLine(line) {
             var d = line.split(",");
-            if (d.length == 5 && d[0] == "A") {
-                var accel = {
-                    ms: parseInt(d[1]),
+            if (d.length >= 3 && d[0] === "A") {
+                result.accel.push({
+                    timestamp: parseInt(d[1]),
                     x: parseInt(d[2]),
                     y: parseInt(d[3]),
                     z: parseInt(d[4])
-                };
-                pX.textContent = accel.x;
-                pY.textContent = accel.y;
-                pZ.textContent = accel.z;
-
-                pXRealtime.textContent = accel.x;
-                pYRealtime.textContent = accel.y;
-                pZRealtime.textContent = accel.z;
+                });
             }
-            if (d.length == 3 && d[0] == "S") {
-                var steps = {
-                    ms: parseInt(d[1]),
+            if (d.length === 3 && d[0] === "S") {
+                result.steps.push({
+                    timestamp: parseInt(d[1]),
                     steps: parseInt(d[2])
-                };
-                pSteps.textContent = steps.steps;
-
-                pStepsRealtime.textContent = steps.steps;
+                });
             }
-            if (d.length == 3 && d[0] == "H") {
-                var hr_data = {
-                    ms: parseInt(d[1]),
-                    hr: parseInt(d[2])
-                };
-                pHeartRate.textContent = hr_data.hr;
-
-                pHeartRateRealtime.textContent = hr_data.hr;
+            if (d.length === 3 && d[0] === "H") {
+                result.hr.push({
+                    timestamp: parseInt(d[1]),
+                    bpm: parseInt(d[2])
+                });
             }
+            updateDataHistory();
+        }
+
+        function updateDataHistory() {
+            dataHistory.innerHTML = "";
+            dataHistory.innerHTML += "<h3>Acceleration</h3>";
+            result.accel.forEach(function (entry) {
+                dataHistory.innerHTML += "<p>X: " + entry.x + ", Y: " + entry.y + ", Z: " + entry.z + ", Timestamp: " + entry.timestamp + "</p>";
+            });
+
+            dataHistory.innerHTML += "<h3>Steps</h3>";
+            result.steps.forEach(function (entry) {
+                dataHistory.innerHTML += "<p>Steps: " + entry.steps + ", Timestamp: " + entry.timestamp + "</p>";
+            });
+
+            dataHistory.innerHTML += "<h3>Heart Rate</h3>";
+            result.hr.forEach(function (entry) {
+                dataHistory.innerHTML += "<p>Heart Rate: " + entry.bpm + ", Timestamp: " + entry.timestamp + "</p>";
+            });
         }
     </script>
 </body>
