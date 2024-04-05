@@ -9,7 +9,6 @@
 <body>
     <script src="https://www.puck-js.com/puck.js"></script>
     <script src="deps/FileSaver.js"></script>
-    <script src="deps/bson.browser.js"></script> <!-- Assuming you have bson.browser.js in 'deps' directory -->
     <h2 style="text-align: center;">Bangle.js data streaming app</h2>
     <main>
         <article>
@@ -51,11 +50,7 @@ Bangle.on('step', function(up) {
         let pMain = document.getElementById("pMain");
         let btnConnect = document.getElementById("btnConnect");
 
-        let result = {
-            accel: [],
-            hr: [],
-            steps: []
-        };
+        let result = {};
 
         try {
             new Blob;
@@ -73,11 +68,10 @@ Bangle.on('step', function(up) {
                 pMain.textContent = 'Ready to connect';
 
                 result.endTs = new Date();
+                console.log(result);
+                var blob = new Blob([JSON.stringify(result)], { type: "text/json;charset=utf-8" });
 
-                var buffer = BSON.serialize(result);
-                var blob = new Blob([buffer], { type: "application/octet-stream" });
-
-                let filename = 'testResults_' + Date.now() + '.bson';
+                let filename = 'testResults_' + Date.now() + '.json';
                 saveAs(blob, filename);
                 return;
             } else {
@@ -116,3 +110,4 @@ Bangle.on('step', function(up) {
     </script>
 </body>
 </html>
+
