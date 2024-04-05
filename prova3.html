@@ -1,3 +1,4 @@
+<!DOCTYPE html>
 <html>
 <head>
     <title>Bangle.js Data streaming</title>
@@ -24,34 +25,32 @@
         // Code to upload to Bangle.js
         var BANGLE_CODE = `
 var start = Date.now();
+function sendBinaryData(type, data) {
+    var buffer = new ArrayBuffer(data.length);
+    var view = new Uint8Array(buffer);
+    for (var i = 0; i < data.length; i++) {
+        view[i] = data.charCodeAt(i);
+    }
+    Bluetooth.write(type);
+    Bluetooth.write(buffer);
+}
+
 Bangle.on('accel', function(a) {
-  var d = [
-    "A",
-    Date.now() - start,
-    Math.round(a.x * 1000),
-    Math.round(a.y * 1000),
-    Math.round(a.z * 1000)
-  ];
-  Bluetooth.println(d.join(","));
+    var d = [
+        Math.round(a.x * 1000),
+        Math.round(a.y * 1000),
+        Math.round(a.z * 1000)
+    ];
+    sendBinaryData("A", String.fromCharCode.apply(null, d));
 });
 
 Bangle.on('step', function(up) {
-    var d = [
-      "S",
-      Date.now() - start,
-      up
-    ];
-    Bluetooth.println(d.join(","));
+    sendBinaryData("S", String.fromCharCode(up));
 });
 
 Bangle.setHRMPower(1);
 Bangle.on('HRM', function(hrm) {
-  var d = [
-    "H",
-    Date.now() - start,
-    hrm.bpm
-  ];
-  Bluetooth.println(d.join(","));
+    sendBinaryData("H", String.fromCharCode(hrm.bpm));
 });
 `;
 
@@ -103,12 +102,8 @@ Bangle.on('HRM', function(hrm) {
                     result.hr = [];
                     // Handle the data we get back, and call 'onLine'
                     // whenever we get a new line
-                    var buf = "";
                     connection.on("data", function (d) {
-                        buf += d;
-                        var l = buf.split("\n");
-                        buf = l.pop();
-                        l.forEach(onLine);
+                        onBinaryData(new Uint8Array(d).buffer);
                     });
 
                     // First, reset the Bangle
@@ -126,40 +121,31 @@ Bangle.on('HRM', function(hrm) {
             }
         });
 
-        // When we get a line of data, check it and if it's
-        // from the accelerometer, update it
-        function onLine(line) {
-            // console.log("RECEIVED:" + line);
-            var d = line.split(",");
-            if (d.length == 5 && d[0] == "A") {
-                // we have an accelerometer reading
+        // When we get binary data, interpret it appropriately
+        function onBinaryData(data) {
+            var type = String.fromCharCode(data[0]);
+            var payload = new Uint8Array(data, 1);
+            if (type === "A" && payload.length === 12) {
                 var accel = {
-                    ms: parseInt(d[1]),
-                    x: parseInt(d[2]),
-                    y: parseInt(d[3]),
-                    z: parseInt(d[4])
+                    x: payload.getInt16(0),
+                    y: payload.getInt16(2),
+                    z: payload.getInt16(4)
                 };
                 pX.textContent = `X: ${accel.x}`;
                 pY.textContent = `Y: ${accel.y}`;
                 pZ.textContent = `Z: ${accel.z}`;
 
                 result.accel.push(accel);
-            }
-            if (d.length == 3 && d[0] == "S") {
-                // we have steps reading
+            } else if (type === "S" && payload.length === 1) {
                 var steps = {
-                    ms: parseInt(d[1]),
-                    steps: parseInt(d[2])
+                    steps: payload[0]
                 };
                 pSteps.textContent = `Steps: ${steps.steps}`;
 
                 result.steps.push(steps);
-            }
-            if (d.length == 3 && d[0] == "H") {
-                // we have an HR monitor reading
+            } else if (type === "H" && payload.length === 1) {
                 var hr_data = {
-                    ms: parseInt(d[1]),
-                    hr: parseInt(d[2])
+                    hr: payload[0]
                 };
                 pHeartRate.textContent = `Heart Rate: ${hr_data.hr}`;
 
@@ -169,4 +155,5 @@ Bangle.on('HRM', function(hrm) {
     </script>
 </body>
 </html>
+
 
