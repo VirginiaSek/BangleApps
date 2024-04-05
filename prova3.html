@@ -1,3 +1,4 @@
+<!DOCTYPE html>
 <html>
 <head>
     <title>Bangle.js Data streaming</title>
@@ -7,7 +8,7 @@
 </head>
 <body>
     <script src="https://www.puck-js.com/puck.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.0/FileSaver.min.js"></script>
+    <script src="deps/FileSaver.js"></script>
     <h2 style="text-align: center;">Bangle.js data streaming app</h2>
     <main>
         <article>
@@ -18,39 +19,41 @@
             <p>Z: <span id="pZ"></span></p>
             <p>Steps: <span id="pSteps"></span></p>
             <p>Heart Rate: <span id="pHeartRate"></span></p>
+            <p>String Value: <span id="pStringValue"></span></p> <!-- Aggiunta della visualizzazione del valore come stringa -->
         </article>
     </main>
     <script>
-        // Code to upload to Bangle.js
         var BANGLE_CODE = `
-var start = Date.now();
-Bangle.on('accel', function(a) {
-  var d = new Uint8Array(13);
-  d[0] = 'A'.charCodeAt(0);
-  new DataView(d.buffer).setUint32(1, Date.now() - start, true);
-  new DataView(d.buffer).setFloat32(5, a.x, true);
-  new DataView(d.buffer).setFloat32(9, a.y, true);
-  new DataView(d.buffer).setFloat32(13, a.z, true);
-  Bluetooth.write(d.buffer);
-});
+            var start = Date.now();
 
-Bangle.on('step', function(up) {
-    var d = new Uint8Array(9);
-    d[0] = 'S'.charCodeAt(0);
-    new DataView(d.buffer).setUint32(1, Date.now() - start, true);
-    new DataView(d.buffer).setUint32(5, up ? 1 : 0, true);
-    Bluetooth.write(d.buffer);
-});
+            function sendBinaryData(data) {
+                var buffer = E.toArrayBuffer(data); 
+                Bluetooth.write(buffer); 
+            }
 
-Bangle.setHRMPower(1);
-Bangle.on('HRM', function(hrm) {
-  var d = new Uint8Array(6);
-  d[0] = 'H'.charCodeAt(0);
-  new DataView(d.buffer).setUint32(1, Date.now() - start, true);
-  new DataView(d.buffer).setUint16(5, hrm.bpm, true);
-  Bluetooth.write(d.buffer);
-});
-`;
+            Bangle.on('accel', function(a) {
+                var buffer = new Int32Array(3); 
+                buffer[0] = Math.round(a.x * 1000);
+                buffer[1] = Math.round(a.y * 1000);
+                buffer[2] = Math.round(a.z * 1000);
+                sendBinaryData(buffer);
+            });
+
+            Bangle.on('step', function(up) {
+                var buffer = new Int32Array(2); 
+                buffer[0] = Date.now() - start;
+                buffer[1] = up ? 1 : 0; 
+                sendBinaryData(buffer);
+            });
+
+            Bangle.setHRMPower(1);
+            Bangle.on('HRM', function(hrm) {
+                var buffer = new Int32Array(2); 
+                buffer[0] = Date.now() - start;
+                buffer[1] = hrm.bpm;
+                sendBinaryData(buffer);
+            });
+        `;
 
         let pMain = document.getElementById("pMain");
         let btnConnect = document.getElementById("btnConnect");
@@ -59,23 +62,20 @@ Bangle.on('HRM', function(hrm) {
         let pZ = document.getElementById("pZ");
         let pSteps = document.getElementById("pSteps");
         let pHeartRate = document.getElementById("pHeartRate");
+        let pStringValue = document.getElementById("pStringValue"); // Aggiunta della variabile per il paragrafo della stringa
 
-        let result = {
-            accel: [],
-            steps: [],
-            hr: []
-        };
+        let result = {};
 
-        // Custom save function to support binary data
-        function saveBinary(data, filename) {
-            var blob = new Blob([data], { type: 'application/octet-stream' });
-            saveAs(blob, filename);
+        try {
+            new Blob;
+        } catch (e) {
+            console.error(e);
+            pMain.textContent = 'File saving not supported';
+            btnConnect.disabled = true;
         }
 
-        // When we click the connect button...
         let connection;
         btnConnect.addEventListener("click", function () {
-            // disconnect if connected already
             if (connection) {
                 connection.close();
                 connection = undefined;
@@ -83,15 +83,12 @@ Bangle.on('HRM', function(hrm) {
 
                 result.endTs = new Date();
                 console.log(result);
+                var blob = new Blob([result], { type: "application/octet-stream" });
 
-                // Convert collected data to JSON
-                let data = JSON.stringify(result);
-                let filename = 'testResults_' + Date.now() + '.json';
-                saveBinary(data, filename);
-                console.log('Data saved successfully.');
+                let filename = 'testResults_' + Date.now() + '.bin';
+                saveAs(blob, filename);
                 return;
             } else {
-                // Connect
                 Puck.connect(function (c) {
                     if (!c) {
                         return;
@@ -99,13 +96,10 @@ Bangle.on('HRM', function(hrm) {
                     connection = c;
                     pMain.textContent = 'Connected!';
                     btnConnect.textContent = 'Disconnect';
-                    // initialise result
                     result.startTs = new Date();
                     result.accel = [];
                     result.steps = [];
                     result.hr = [];
-                    // Handle the data we get back, and call 'onLine'
-                    // whenever we get a new line
                     var buf = "";
                     connection.on("data", function (d) {
                         buf += d;
@@ -114,11 +108,8 @@ Bangle.on('HRM', function(hrm) {
                         l.forEach(onLine);
                     });
 
-                    // First, reset the Bangle
                     connection.write("reset();\n", function () {
-                        // Wait for it to reset itself
                         setTimeout(function () {
-                            // Now upload our code to it
                             connection.write("\x03\x10if(1){" + BANGLE_CODE + "}\n",
                                 () => {
                                     console.log("Ready...");
@@ -129,48 +120,50 @@ Bangle.on('HRM', function(hrm) {
             }
         });
 
-        // When we get a line of data, check it and if it's
-        // from the accelerometer, update it
         function onLine(line) {
-            // console.log("RECEIVED:" + line);
             var d = line.split(",");
             if (d.length == 5 && d[0] == "A") {
-                // we have an accelerometer reading
                 var accel = {
                     ms: parseInt(d[1]),
                     x: parseInt(d[2]),
                     y: parseInt(d[3]),
                     z: parseInt(d[4])
                 };
-                pX.textContent = `X: ${accel.x}`;
-                pY.textContent = `Y: ${accel.y}`;
-                pZ.textContent = `Z: ${accel.z}`;
-
+                pX.textContent = accel.x;
+                pY.textContent = accel.y;
+                pZ.textContent = accel.z;
                 result.accel.push(accel);
             }
             if (d.length == 3 && d[0] == "S") {
-                // we have steps reading
                 var steps = {
                     ms: parseInt(d[1]),
                     steps: parseInt(d[2])
                 };
-                pSteps.textContent = `Steps: ${steps.steps}`;
-
+                pSteps.textContent = steps.steps;
                 result.steps.push(steps);
             }
             if (d.length == 3 && d[0] == "H") {
-                // we have an HR monitor reading
                 var hr_data = {
                     ms: parseInt(d[1]),
                     hr: parseInt(d[2])
                 };
-                pHeartRate.textContent = `Heart Rate: ${hr_data.hr}`;
-
+                pHeartRate.textContent = hr_data.hr;
                 result.hr.push(hr_data);
+            }
+
+            // Aggiornamento della stringa dei valori ad ogni passo rilevato
+            calculateStringValue();
+        }
+
+        function calculateStringValue() {
+            if (result.accel.length > 0 && result.steps.length > 0 && result.hr.length > 0) {
+                var stringValue = "Accelerometer: (" + result.accel[result.accel.length - 1].x + ", " + result.accel[result.accel.length - 1].y + ", " + result.accel[result.accel.length - 1].z + "), " +
+                                  "Steps: " + result.steps[result.steps.length - 1].steps + ", " +
+                                  "Heart Rate: " + result.hr[result.hr.length - 1].hr;
+                pStringValue.textContent = stringValue;
             }
         }
     </script>
 </body>
 </html>
-
 
