@@ -7,17 +7,16 @@
 </head>
 <body>
     <script src="https://www.puck-js.com/puck.js"></script>
-    <script src="deps/FileSaver.js"></script>
     <h2 style="text-align: center;">Bangle.js data streaming app</h2>
     <main>
         <article>
             <p id="pMain">Ready to connect</p>
             <button id="btnConnect">Connect</button>
-            <p id="pX">X: </p>
-            <p id="pY">Y: </p>
-            <p id="pZ">Z: </p>
-            <p id="pSteps">Steps: </p>
-            <p id="pHeartRate">Heart Rate: </p>
+            <p>X: <span id="pX"></span></p>
+            <p>Y: <span id="pY"></span></p>
+            <p>Z: <span id="pZ"></span></p>
+            <p>Steps: <span id="pSteps"></span></p>
+            <p>Heart Rate: <span id="pHeartRate"></span></p>
         </article>
     </main>
     <script>
@@ -63,16 +62,11 @@ Bangle.on('HRM', function(hrm) {
         let pSteps = document.getElementById("pSteps");
         let pHeartRate = document.getElementById("pHeartRate");
 
-        let result = {};
-
-        // detect file saving capability
-        try {
-            new Blob;
-        } catch (e) {
-            console.error(e);
-            pMain.textContent = 'File saving not supported';
-            btnConnect.disabled = true;
-        }
+        let result = {
+            accel: [],
+            steps: [],
+            hr: []
+        };
 
         // When we click the connect button...
         let connection;
@@ -98,7 +92,7 @@ Bangle.on('HRM', function(hrm) {
                 });
 
                 let filename = 'testResults_' + Date.now() + '.bin';
-                saveAs(new Blob([accelData]), filename);
+                saveToFile(accelData, filename);
                 return;
             } else {
                 // Connect
@@ -179,7 +173,18 @@ Bangle.on('HRM', function(hrm) {
                 result.hr.push(hr_data);
             }
         }
+
+        function saveToFile(data, filename) {
+            let a = document.createElement('a');
+            a.href = URL.createObjectURL(new Blob([data], {type: 'application/octet-stream'}));
+            a.download = filename;
+            a.style.display = 'none';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+        }
     </script>
 </body>
 </html>
+
 
