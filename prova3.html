@@ -26,8 +26,8 @@
         var BANGLE_CODE = `
 var start = Date.now();
 Bangle.on('accel', function(a) {
-    var d = new ArrayBuffer(10);
-    var dv = new DataView(d);
+    var d = new Uint8Array(10);
+    var dv = new DataView(d.buffer);
     dv.setInt16(0, Math.round(a.x * 1000), true);
     dv.setInt16(2, Math.round(a.y * 1000), true);
     dv.setInt16(4, Math.round(a.z * 1000), true);
@@ -36,8 +36,8 @@ Bangle.on('accel', function(a) {
 });
 
 Bangle.on('step', function(up) {
-    var d = new ArrayBuffer(4);
-    var dv = new DataView(d);
+    var d = new Uint8Array(4);
+    var dv = new DataView(d.buffer);
     dv.setUint16(0, up, true);
     dv.setUint16(2, Date.now() - start, true);
     Bluetooth.write(d);
@@ -45,8 +45,8 @@ Bangle.on('step', function(up) {
 
 Bangle.setHRMPower(1);
 Bangle.on('HRM', function(hrm) {
-    var d = new ArrayBuffer(3);
-    var dv = new DataView(d);
+    var d = new Uint8Array(3);
+    var dv = new DataView(d.buffer);
     dv.setUint8(0, hrm.bpm);
     dv.setUint16(1, Date.now() - start, true);
     Bluetooth.write(d);
@@ -122,3 +122,4 @@ Bangle.on('HRM', function(hrm) {
     </script>
 </body>
 </html>
+
