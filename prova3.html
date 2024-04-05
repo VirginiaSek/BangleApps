@@ -127,9 +127,9 @@ Bangle.on('HRM', function(hrm) {
             var payload = new Uint8Array(data, 1);
             if (type === "A" && payload.length === 12) {
                 var accel = {
-                    x: payload.getInt16(0),
-                    y: payload.getInt16(2),
-                    z: payload.getInt16(4)
+                    x: payload.getInt16(0) / 1000,
+                    y: payload.getInt16(2) / 1000,
+                    z: payload.getInt16(4) / 1000
                 };
                 pX.textContent = `X: ${accel.x}`;
                 pY.textContent = `Y: ${accel.y}`;
@@ -155,5 +155,4 @@ Bangle.on('HRM', function(hrm) {
     </script>
 </body>
 </html>
-
 
