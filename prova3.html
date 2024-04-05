@@ -23,33 +23,32 @@
     </main>
 
     <script>
-        // Code to upload to Bangle.js
         var BANGLE_CODE = `
 var start = Date.now();
 Bangle.on('accel', function(a) {
-    var d = new ArrayBuffer(10); // 2 bytes per axis, 3 axes
+    var d = new ArrayBuffer(10);
     var dv = new DataView(d);
-    dv.setInt16(0, Math.round(a.x * 1000), true); // Little-endian
+    dv.setInt16(0, Math.round(a.x * 1000), true);
     dv.setInt16(2, Math.round(a.y * 1000), true);
     dv.setInt16(4, Math.round(a.z * 1000), true);
-    dv.setUint32(6, Date.now() - start, true); // Time in milliseconds
+    dv.setUint32(6, Date.now() - start, true);
     Bluetooth.write(d);
 });
 
 Bangle.on('step', function(up) {
-    var d = new ArrayBuffer(4); // 2 bytes for step count, 2 bytes for time
+    var d = new ArrayBuffer(4);
     var dv = new DataView(d);
-    dv.setUint16(0, up, true); // Little-endian
-    dv.setUint16(2, Date.now() - start, true); // Time in milliseconds
+    dv.setUint16(0, up, true);
+    dv.setUint16(2, Date.now() - start, true);
     Bluetooth.write(d);
 });
 
 Bangle.setHRMPower(1);
 Bangle.on('HRM', function(hrm) {
-    var d = new ArrayBuffer(3); // 1 byte for heart rate, 2 bytes for time
+    var d = new ArrayBuffer(3);
     var dv = new DataView(d);
     dv.setUint8(0, hrm.bpm);
-    dv.setUint16(1, Date.now() - start, true); // Time in milliseconds
+    dv.setUint16(1, Date.now() - start, true);
     Bluetooth.write(d);
 });
 `;
@@ -64,27 +63,19 @@ Bangle.on('HRM', function(hrm) {
 
         let result = [];
 
-        // When we click the connect button...
         let connection;
         btnConnect.addEventListener("click", function () {
-            // disconnect if connected already
             if (connection) {
                 connection.close();
                 connection = undefined;
                 pMain.textContent = 'Ready to connect';
                 console.log(result);
 
-                // Convertiamo gli array di byte in una stringa binaria
                 const binaryString = result.map(byte => String.fromCharCode(byte)).join('');
-
-                // Create a new Blob object containing the binary data
                 var blob = new Blob([binaryString], { type: "application/octet-stream" });
-
-                // Save the Blob object as a file
                 saveAs(blob, 'testResults_' + Date.now() + '.bin');
                 return;
             } else {
-                // Connect
                 Puck.connect(function (c) {
                     if (!c) {
                         return;
@@ -92,10 +83,7 @@ Bangle.on('HRM', function(hrm) {
                     connection = c;
                     pMain.textContent = 'Connected!';
                     btnConnect.textContent = 'Disconnect';
-                    // initialise result
                     result = [];
-                    // Handle the data we get back, and call 'onLine'
-                    // whenever we get a new line
                     var buf = "";
                     connection.on("data", function (d) {
                         buf += d;
@@ -103,12 +91,8 @@ Bangle.on('HRM', function(hrm) {
                         buf = l.pop();
                         l.forEach(onLine);
                     });
-
-                    // First, reset the Bangle
                     connection.write("reset();\n", function () {
-                        // Wait for it to reset itself
                         setTimeout(function () {
-                            // Now upload our code to it
                             connection.write("\x03\x10if(1){" + BANGLE_CODE + "}\n",
                                 () => {
                                     console.log("Ready...");
@@ -119,8 +103,6 @@ Bangle.on('HRM', function(hrm) {
             }
         });
 
-        // When we get a line of data, check it and if it's
-        // from the accelerometer, update it
         function onLine(line) {
             var d = line.split(",");
             if (d.length >= 3) {
@@ -134,7 +116,6 @@ Bangle.on('HRM', function(hrm) {
                 } else if (dataType === "H" && d.length === 3) {
                     pHeartRate.textContent = d[2];
                 }
-                // Append line to result array for binary saving
                 result.push(...line.split(",").map(Number));
             }
         }
