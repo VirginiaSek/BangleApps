@@ -14,56 +14,45 @@
         <article>
             <p id="pMain">Ready to connect</p>
             <button id="btnConnect">Connect</button>
-            <p>X: <span id="pX"></span></p>
-            <p>Y: <span id="pY"></span></p>
-            <p>Z: <span id="pZ"></span></p>
-            <p>Steps: <span id="pSteps"></span></p>
-            <p>Heart Rate: <span id="pHeartRate"></span></p>
-            <p>Steps (String): <span id="pStepsString"></span></p>
-            <p>Heart Rate (String): <span id="pHeartRateString"></span></p>
+            <p>X: <span id="pX"></span> | X Real-time: <span id="pXRealtime"></span></p>
+            <p>Y: <span id="pY"></span> | Y Real-time: <span id="pYRealtime"></span></p>
+            <p>Z: <span id="pZ"></span> | Z Real-time: <span id="pZRealtime"></span></p>
+            <p>Steps: <span id="pSteps"></span> | Steps Real-time: <span id="pStepsRealtime"></span></p>
+            <p>Heart Rate: <span id="pHeartRate"></span> | Heart Rate Real-time: <span id="pHeartRateRealtime"></span></p>
         </article>
     </main>
     <script>
-        // Code to upload to Bangle.js
         var BANGLE_CODE = `
-        var start = Date.now();
-
-
-function sendBinaryData(data) {
-  var buffer = E.toArrayBuffer(data); // Converti in ArrayBuffer
-  Bluetooth.write(buffer); // Invia dati binari
-}
-
+var start = Date.now();
 Bangle.on('accel', function(a) {
-  var buffer = new Int32Array(3); // 3 * 4 byte per x, y, z
-  buffer[0] = Math.round(a.x * 1000);
-  buffer[1] = Math.round(a.y * 1000);
-  buffer[2] = Math.round(a.z * 1000);
-  sendBinaryData(buffer);
+  var d = [
+    "A",
+    Date.now() - start,
+    Math.round(a.x * 1000),
+    Math.round(a.y * 1000),
+    Math.round(a.z * 1000)
+  ];
+  Bluetooth.println(d.join(","));
 });
 
 Bangle.on('step', function(up) {
-  var buffer = new Int32Array(2); // 2 * 4 byte per timestamp e steps
-  buffer[0] = Date.now() - start;
-  buffer[1] = up ? 1 : 0; // Converti il valore booleano in un byte
-  sendBinaryData(buffer);
-
-  // Aggiorna il valore di Steps come stringa
-  document.getElementById("pStepsString").textContent = up ? 'Step detected' : 'No step';
+    var d = [
+      "S",
+      Date.now() - start,
+      up
+    ];
+    Bluetooth.println(d.join(","));
 });
 
 Bangle.setHRMPower(1);
 Bangle.on('HRM', function(hrm) {
-  var buffer = new Int32Array(2); // 2 * 4 byte per timestamp e bpm
-  buffer[0] = Date.now() - start;
-  buffer[1] = hrm.bpm;
-  sendBinaryData(buffer);
-
-  // Aggiorna il valore di Heart Rate come stringa
-  document.getElementById("pHeartRateString").textContent = hrm.bpm + ' bpm';
+  var d = [
+    "H",
+    Date.now() - start,
+    hrm.bpm
+  ];
+  Bluetooth.println(d.join(","));
 });
-
-
 `;
 
         let pMain = document.getElementById("pMain");
@@ -74,9 +63,16 @@ Bangle.on('HRM', function(hrm) {
         let pSteps = document.getElementById("pSteps");
         let pHeartRate = document.getElementById("pHeartRate");
 
-        let result = {};
+        // Real-time data spans
+        let pXRealtime = document.getElementById("pXRealtime");
+        let pYRealtime = document.getElementById("pYRealtime");
+        let pZRealtime = document.getElementById("pZRealtime");
+        let pStepsRealtime = document.getElementById("pStepsRealtime");
+        let pHeartRateRealtime = document.getElementById("pHeartRateRealtime");
 
-        // detect file saving capability
+        let result = {};
+        let connection;
+
         try {
             new Blob;
         } catch (e) {
@@ -85,10 +81,7 @@ Bangle.on('HRM', function(hrm) {
             btnConnect.disabled = true;
         }
 
-        // When we click the connect button...
-        let connection;
         btnConnect.addEventListener("click", function () {
-            // disconnect if connected already
             if (connection) {
                 connection.close();
                 connection = undefined;
@@ -96,13 +89,12 @@ Bangle.on('HRM', function(hrm) {
 
                 result.endTs = new Date();
                 console.log(result);
-                var blob = new Blob([result], { type: "application/octet-stream" });
+                var blob = new Blob([JSON.stringify(result)], { type: "text/json;charset=utf-8" });
 
-                let filename = 'testResults_' + Date.now() + '.bin';
+                let filename = 'testResults_' + Date.now() + '.json';
                 saveAs(blob, filename);
                 return;
             } else {
-                // Connect
                 Puck.connect(function (c) {
                     if (!c) {
                         return;
@@ -110,13 +102,12 @@ Bangle.on('HRM', function(hrm) {
                     connection = c;
                     pMain.textContent = 'Connected!';
                     btnConnect.textContent = 'Disconnect';
-                    // initialise result
+
                     result.startTs = new Date();
                     result.accel = [];
                     result.steps = [];
                     result.hr = [];
-                    // Handle the data we get back, and call 'onLine'
-                    // whenever we get a new line
+
                     var buf = "";
                     connection.on("data", function (d) {
                         buf += d;
@@ -125,11 +116,8 @@ Bangle.on('HRM', function(hrm) {
                         l.forEach(onLine);
                     });
 
-                    // First, reset the Bangle
                     connection.write("reset();\n", function () {
-                        // Wait for it to reset itself
                         setTimeout(function () {
-                            // Now upload our code to it
                             connection.write("\x03\x10if(1){" + BANGLE_CODE + "}\n",
                                 () => {
                                     console.log("Ready...");
@@ -140,13 +128,9 @@ Bangle.on('HRM', function(hrm) {
             }
         });
 
-        // When we get a line of data, check it and if it's
-        // from the accelerometer, update it
         function onLine(line) {
-            // console.log("RECEIVED:" + line);
             var d = line.split(",");
             if (d.length == 5 && d[0] == "A") {
-                // we have an accelerometer reading
                 var accel = {
                     ms: parseInt(d[1]),
                     x: parseInt(d[2]),
@@ -157,33 +141,27 @@ Bangle.on('HRM', function(hrm) {
                 pY.textContent = accel.y;
                 pZ.textContent = accel.z;
 
-                result.accel.push(accel);
+                pXRealtime.textContent = accel.x;
+                pYRealtime.textContent = accel.y;
+                pZRealtime.textContent = accel.z;
             }
             if (d.length == 3 && d[0] == "S") {
-                // we have steps reading
                 var steps = {
                     ms: parseInt(d[1]),
                     steps: parseInt(d[2])
                 };
                 pSteps.textContent = steps.steps;
 
-                result.steps.push(steps);
-
-                // Aggiorna il valore di Steps come stringa
-                document.getElementById("pStepsString").textContent = steps.steps > 0 ? 'Step detected' : 'No step';
+                pStepsRealtime.textContent = steps.steps;
             }
             if (d.length == 3 && d[0] == "H") {
-                // we have an HR monitor reading
                 var hr_data = {
                     ms: parseInt(d[1]),
                     hr: parseInt(d[2])
                 };
                 pHeartRate.textContent = hr_data.hr;
 
-                result.hr.push(hr_data);
-
-                // Aggiorna il valore di Heart Rate come stringa
-                document.getElementById("pHeartRateString").textContent = hr_data.hr + ' bpm';
+                pHeartRateRealtime.textContent = hr_data.hr;
             }
         }
     </script>
