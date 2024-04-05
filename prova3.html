@@ -81,15 +81,11 @@ Bangle.on('HRM', function(hrm) {
                 result.endTs = new Date();
                 console.log(result);
 
-                // Convert collected data to binary
-                let data = prepareData(result);
-                if (data) {
-                    let filename = 'testResults_' + Date.now() + '.bin';
-                    saveAs(new Blob([data]), filename);
-                    console.log('Data saved successfully.');
-                } else {
-                    console.error('Error preparing data for saving.');
-                }
+                // Convert collected data to JSON
+                let data = JSON.stringify(result);
+                let filename = 'testResults_' + Date.now() + '.json';
+                saveAs(new Blob([data], {type: 'application/json'}), filename);
+                console.log('Data saved successfully.');
                 return;
             } else {
                 // Connect
@@ -168,30 +164,6 @@ Bangle.on('HRM', function(hrm) {
                 pHeartRate.textContent = `Heart Rate: ${hr_data.hr}`;
 
                 result.hr.push(hr_data);
-            }
-        }
-
-        function prepareData(result) {
-            try {
-                let data = [];
-                result.accel.forEach(entry => {
-                    data.push(entry.ms);
-                    data.push(entry.x);
-                    data.push(entry.y);
-                    data.push(entry.z);
-                });
-                result.steps.forEach(entry => {
-                    data.push(entry.ms);
-                    data.push(entry.steps);
-                });
-                result.hr.forEach(entry => {
-                    data.push(entry.ms);
-                    data.push(entry.hr);
-                });
-                return new Uint32Array(data).buffer;
-            } catch (error) {
-                console.error(error);
-                return null;
             }
         }
     </script>
