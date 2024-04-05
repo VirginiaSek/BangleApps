@@ -41,9 +41,7 @@
       reader.readAsDataURL(blob);
     } else {
       var blobUrl = URL.createObjectURL(blob); // Create a blob URL
-      if (popup) popup.location = blobUrl;
-      else location.href = blobUrl;
-      popup = null;
+      saveAs(blobUrl, name); // Save the blob URL
     }
   }
 
@@ -53,4 +51,5 @@
     module.exports = saveAs;
   }
 });
+
 
