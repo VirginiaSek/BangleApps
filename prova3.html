@@ -74,8 +74,11 @@ Bangle.on('HRM', function(hrm) {
                 pMain.textContent = 'Ready to connect';
                 console.log(result);
 
+                // Convertiamo gli array di byte in una stringa binaria
+                const binaryString = result.map(byte => String.fromCharCode(byte)).join('');
+
                 // Create a new Blob object containing the binary data
-                var blob = new Blob(result, { type: "application/octet-stream" });
+                var blob = new Blob([binaryString], { type: "application/octet-stream" });
 
                 // Save the Blob object as a file
                 saveAs(blob, 'testResults_' + Date.now() + '.bin');
@@ -132,10 +135,9 @@ Bangle.on('HRM', function(hrm) {
                     pHeartRate.textContent = d[2];
                 }
                 // Append line to result array for binary saving
-                result.push(new Uint8Array(line.split(",").map(Number)));
+                result.push(...line.split(",").map(Number));
             }
         }
     </script>
 </body>
 </html>
-
