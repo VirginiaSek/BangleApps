@@ -1,19 +1,14 @@
-
-<!-- Codice del prof con solo accelerometro, passi e monitoraggio della frequenza cardiaca (senza bussola e pressione)-->
 <html>
-    
 <head>
     <title>Bangle.js Data streaming</title>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <link rel="stylesheet" href="https://cdn.rawgit.com/kimeiga/bahunya/css/bahunya-0.1.1.css" />
 </head>
-
 <body>
     <script src="https://www.puck-js.com/puck.js"></script>
     <script src="deps/FileSaver.js"></script>
     <h2 style="text-align: center;">Bangle.js data streaming app</h2>
-
     <main>
         <article>
             <p id="pMain">Ready to connect</p>
@@ -23,12 +18,8 @@
             <p>Z: <span id="pZ"></span></p>
             <p>Steps: <span id="pSteps"></span></p>
             <p>Heart Rate: <span id="pHeartRate"></span></p>
-            <p>Heart Rate Confidence: <span id="pHeartRateConfidence"></span></p>
         </article>
-
     </main>
-
-
     <script>
         // Code to upload to Bangle.js
         var BANGLE_CODE = `
@@ -58,8 +49,7 @@ Bangle.on('HRM', function(hrm) {
   var d = [
     "H",
     Date.now() - start,
-    hrm.bpm,
-    hrm.confidence
+    hrm.bpm
   ];
   Bluetooth.println(d.join(","));
 });
@@ -72,7 +62,6 @@ Bangle.on('HRM', function(hrm) {
         let pZ = document.getElementById("pZ");
         let pSteps = document.getElementById("pSteps");
         let pHeartRate = document.getElementById("pHeartRate");
-        let pHeartRateConfidence = document.getElementById("pHeartRateConfidence");
 
         let result = {};
 
@@ -169,20 +158,17 @@ Bangle.on('HRM', function(hrm) {
 
                 result.steps.push(steps);
             }
-            if (d.length == 4 && d[0] == "H") {
+            if (d.length == 3 && d[0] == "H") {
                 // we have an HR monitor reading
                 var hr_data = {
                     ms: parseInt(d[1]),
-                    hr: parseInt(d[2]),
-                    conf: parseInt(d[3])
+                    hr: parseInt(d[2])
                 };
                 pHeartRate.textContent = hr_data.hr;
-                pHeartRateConfidence.textContent = hr_data.conf;
 
                 result.hr.push(hr_data);
             }
         }
     </script>
 </body>
-
 </html>
