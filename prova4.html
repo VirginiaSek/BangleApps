@@ -87,9 +87,9 @@ Bangle.on('HRM', function(hrm) {
 
                 result.endTs = new Date();
                 console.log(result);
-                var blob = new Blob([result], { type: "application/octet-stream" });
+              var blob = new Blob([result], { type: "application/octet-stream" });
+                let filename = 'testResults_' + Date.now() + '.raw';
 
-                let filename = 'testResults_' + Date.now() + '.bin';
                 saveAs(blob, filename);
                 return;
             } else {
