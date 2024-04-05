@@ -92,7 +92,11 @@ Bangle.on('HRM', function(hrm) {
                 });
 
                 let filename = 'testResults_' + Date.now() + '.bin';
-                saveToFile(accelData, filename);
+                if (saveToFile(accelData, filename)) {
+                    console.log('Data saved successfully.');
+                } else {
+                    console.error('Error saving data.');
+                }
                 return;
             } else {
                 // Connect
@@ -175,16 +179,21 @@ Bangle.on('HRM', function(hrm) {
         }
 
         function saveToFile(data, filename) {
-            let a = document.createElement('a');
-            a.href = URL.createObjectURL(new Blob([data], {type: 'application/octet-stream'}));
-            a.download = filename;
-            a.style.display = 'none';
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
+            try {
+                let a = document.createElement('a');
+                a.href = URL.createObjectURL(new Blob([data], {type: 'application/octet-stream'}));
+                a.download = filename;
+                a.style.display = 'none';
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                return true;
+            } catch (error) {
+                console.error(error);
+                return false;
+            }
         }
     </script>
 </body>
 </html>
-
 
