@@ -1,4 +1,3 @@
-
 <html>
 <head>
     <title>Bangle.js Data streaming</title>
@@ -24,38 +23,36 @@
     <script>
         // Code to upload to Bangle.js
         var BANGLE_CODE = `
-        var start = Date.now();
-
-
-function sendBinaryData(data) {
-  var buffer = E.toArrayBuffer(data); // Converti in ArrayBuffer
-  Bluetooth.write(buffer); // Invia dati binari
-}
-
+var start = Date.now();
 Bangle.on('accel', function(a) {
-  var buffer = new Int32Array(3); // 3 * 4 byte per x, y, z
-  buffer[0] = Math.round(a.x * 1000);
-  buffer[1] = Math.round(a.y * 1000);
-  buffer[2] = Math.round(a.z * 1000);
-  sendBinaryData(buffer);
+  var d = [
+    "A",
+    Date.now() - start,
+    Math.round(a.x * 1000),
+    Math.round(a.y * 1000),
+    Math.round(a.z * 1000)
+  ];
+  Bluetooth.println(d.join(","));
 });
 
 Bangle.on('step', function(up) {
-  var buffer = new Int32Array(2); // 2 * 4 byte per timestamp e steps
-  buffer[0] = Date.now() - start;
-  buffer[1] = up ? 1 : 0; // Converti il valore booleano in un byte
-  sendBinaryData(buffer);
+    var d = [
+      "S",
+      Date.now() - start,
+      up
+    ];
+    Bluetooth.println(d.join(","));
 });
 
 Bangle.setHRMPower(1);
-Bangle.on('HRM', function(hrm) {
-  var buffer = new Int32Array(2); // 2 * 4 byte per timestamp e bpm
-  buffer[0] = Date.now() - start;
-  buffer[1] = hrm.bpm;
-  sendBinaryData(buffer);
+Bangle.on('HRM-raw', function(hrm) {
+  var d = [
+    "H",
+    Date.now() - start,
+    hrm.bpm
+  ];
+  Bluetooth.println(d.join(","));
 });
-
-
 `;
 
         let pMain = document.getElementById("pMain");
@@ -88,9 +85,9 @@ Bangle.on('HRM', function(hrm) {
 
                 result.endTs = new Date();
                 console.log(result);
-              var blob = new Blob([result], { type: "application/octet-stream" });
-                let filename = 'testResults_' + Date.now() + '.raw';
+                var blob = new Blob([JSON.stringify(result)], { type: "text/json;charset=utf-8" });
 
+                let filename = 'testResults_' + Date.now() + '.json';
                 saveAs(blob, filename);
                 return;
             } else {
@@ -100,7 +97,7 @@ Bangle.on('HRM', function(hrm) {
                         return;
                     }
                     connection = c;
-                    pMain.textContent = 'Connected!!!!';
+                    pMain.textContent = 'Connected!';
                     btnConnect.textContent = 'Disconnect';
                     // initialise result
                     result.startTs = new Date();
