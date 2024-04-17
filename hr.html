@@ -3,146 +3,88 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dati dal file JavaScript su GitHub</title>
+    <title>Bangle.js Data Streaming</title>
+    <link rel="stylesheet" href="https://cdn.rawgit.com/kimeiga/bahunya/css/bahunya-0.1.1.css">
 </head>
 <body>
-    <h1>Dati dal file JavaScript su GitHub</h1>
-    <div id="output"></div>
-
+    <h2 style="text-align: center;">Bangle.js Data Streaming App</h2>
+    <main>
+        <article>
+            <p id="pMain">Ready to connect</p>
+            <button id="btnConnect">Connect</button>
+            <p>Heart Rate: <span id="pHeartRate"></span></p>
+        </article>
+    </main>
+    <script src="https://www.puck-js.com/puck.js"></script>
+    <script src="deps/FileSaver.js"></script>
     <script>
-        // Contenuto dell'oggetto JavaScript
-        var hrData = {
-            if (process.env.HWVERSION == 1) {
-  Bangle.setLCDPower(1);
-  Bangle.setLCDTimeout(0);
-}
-
-Bangle.setHRMPower(1);
-var hrmInfo = {}, hrmOffset = 0;
-var hrmInterval;
-var btm = g.getHeight()-1;
-var lastHrmPt = []; // last xy coords we draw a line to
-
-function onHRM(h) {
-  if (counter!==undefined) {
-    // the first time we're called remove
-    // the countdown
-    counter = undefined;
-    g.clearRect(0,24,g.getWidth(),g.getHeight());
-  }
-  hrmInfo = h;
-  /* On 2v09 and earlier firmwares the only solution for realtime
-  HRM was to look at the 'raw' array that got reported. If you timed
-  it right you could grab the data pretty much as soon as it was written.
-  In new firmwares, '.raw' is not available. */
-  if (hrmInterval) clearInterval(hrmInterval);
-  hrmInterval = undefined;
-  if (hrmInfo.raw) {
-    hrmOffset = 0;
-    setTimeout(function() {
-      hrmInterval = setInterval(readHRM,41);
-    }, 40);
-  }
-  updateHrm();
-}
-Bangle.on('HRM', onHRM);
-
-function updateHrm(){
-  var px = g.getWidth()/2;
-  g.setFontAlign(0,-1);
-  g.clearRect(0,24,g.getWidth(),80);
-  g.setFont("6x8").drawString(/*LANG*/"Confidence "+(hrmInfo.confidence || "--")+"%", px, 70);
-
-  updateScale();
-
-  g.setFontAlign(0,0);
-  var str = hrmInfo.bpm || "--";
-  g.setFontVector(40).setColor(hrmInfo.confidence > 50 ? g.theme.fg : "#888").drawString(str,px,45);
-  px += g.stringWidth(str)/2;
-  g.setFont("6x8").setColor(g.theme.fg);
-  g.drawString(/*LANG*/"BPM",px+15,45);
-}
-
-function updateScale(){
-    g.setFontAlign(-1,-1);
-    g.clearRect(2,70,40,78);
-    g.setFont("6x8").drawString(scale, 2, 70);
-}
-
-var rawMax = 0;
-var scale = 2000;
-//var MID = (g.getHeight()+80)/2;
-/* On newer (2v10) firmwares we can subscribe to get
-HRM events as they happen */
-Bangle.on('HRM-raw', function(v) {
-  hrmOffset++;
-  if (hrmOffset>g.getWidth()) {
-    let thousands = Math.round(rawMax / 1000) * 1000;
-    if (thousands > scale) scale = thousands;
-
-    g.clearRect(0,80,g.getWidth(),g.getHeight());
-    updateScale();
-
-    hrmOffset=0;
-    lastHrmPt = [-100,0];
-  }
-  if (rawMax < v.raw) {
-    rawMax = v.raw;
-  }
-  let y = E.clip(btm-(8+v.filt/3000),btm-24,btm);
-  g.setColor(1,0,0).fillRect(hrmOffset,btm, hrmOffset, y);
-  y = E.clip(btm - (v.raw/scale*84),84,btm);
-  g.setColor(g.theme.fg).drawLine(lastHrmPt[0],lastHrmPt[1],hrmOffset, y);
-  lastHrmPt = [hrmOffset, y];
-  if (counter !==undefined) {
-    counter = undefined;
-    g.clearRect(0,24,g.getWidth(),g.getHeight());
-    updateHrm();
-  }
-});
-
-// It takes 5 secs for us to get the first HRM event
-var counter = 5;
-function countDown() {
-  if (counter) {
-    g.drawString(counter--,g.getWidth()/2,g.getHeight()/2, true);
-    setTimeout(countDown, 1000);
-  }
-}
-g.clear();
-Bangle.loadWidgets();
-Bangle.drawWidgets();
-g.setColor(g.theme.fg);
-g.reset().setFont("6x8",2).setFontAlign(0,-1);
-g.drawString(/*LANG*/"Please wait...",g.getWidth()/2,g.getHeight()/2 - 16);
-countDown();
-
-
-//var wasHigh = 0, wasLow = 0;
-//var lastHigh = getTime();
-//var hrmList = [];
-var hrmInfo;
-
-function readHRM() {
-  if (!hrmInfo) return;
-
-  if (hrmOffset==0) {
-    g.clearRect(0,100,g.getWidth(),g.getHeight());
-    lastHrmPt = [-100,0];
-  }
-  for (var i=0;i<2;i++) {
-    var a = hrmInfo.raw[hrmOffset];
-    hrmOffset++;
-    let y = E.clip(170 - (a*2),100,230);
-    g.setColor(g.theme.fg).drawLine(lastHrmPt[0],lastHrmPt[1],hrmOffset, y);
-    lastHrmPt = [hrmOffset, y];
-  }
-}
+        var result = {
+            hr: []
         };
 
-        // Elabora i dati JavaScript
-        const outputDiv = document.getElementById('output');
-        outputDiv.innerHTML = '<pre>' + JSON.stringify(hrData, null, 4) + '</pre>';
+        var startTimestamp;
+
+        var btnConnect = document.getElementById("btnConnect");
+        var pMain = document.getElementById("pMain");
+        var pHeartRate = document.getElementById("pHeartRate");
+
+        var connection;
+
+        btnConnect.addEventListener("click", function () {
+            if (connection) {
+                connection.close();
+                connection = undefined;
+                pMain.textContent = 'Ready to connect';
+
+                var filename = 'testResults_' + Date.now() + '.json';
+                var blob = new Blob([JSON.stringify(result)], { type: "application/json;charset=utf-8" });
+                saveAs(blob, filename);
+                return;
+            } else {
+                Puck.connect(function (c) {
+                    if (!c) return;
+                    connection = c;
+                    pMain.textContent = 'Connected!';
+                    btnConnect.textContent = 'Disconnect';
+
+                    result = {
+                        hr: []
+                    };
+                    startTimestamp = Date.now();
+
+                    connection.on("data", function (d) {
+                        processData(d);
+                    });
+
+                    connection.write("reset();\n", function () {
+                        setTimeout(function () {
+                            connection.write("\x03\x10if(1){" + BANGLE_CODE + "}\n", () => {});
+                        }, 1500);
+                    });
+                });
+            }
+        });
+
+        function processData(data) {
+            var lines = data.split("\n");
+            lines.forEach(function(line) {
+                var parts = line.split(",");
+                if (parts.length >= 3) {
+                    if (parts[0] === "H") {
+                        recordHRData(parts);
+                    }
+                }
+            });
+        }
+
+        function recordHRData(data) {
+            var hrData = {
+                ms: parseInt(data[1]),
+                hr: parseInt(data[2])
+            };
+            result.hr.push(hrData);
+            pHeartRate.textContent = hrData.hr;
+        }
     </script>
 </body>
 </html>
