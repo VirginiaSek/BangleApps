@@ -40,7 +40,7 @@ Bangle.on('step', function(up) {
 });
 
 Bangle.setHRMPower(1);
-Bangle.on('HRM-raw', function(hrm) {
+Bangle.on('HRM', function(hrm) {
   var d = [
     "H",
     Date.now() - start,
