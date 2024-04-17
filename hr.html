@@ -3,34 +3,22 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Leggi JSON da GitHub</title>
+    <title>Dati dal file JavaScript su GitHub</title>
 </head>
 <body>
-    <h1>Dati JSON da GitHub</h1>
+    <h1>Dati dal file JavaScript su GitHub</h1>
     <div id="output"></div>
 
     <script>
-        // Effettua una richiesta HTTP GET per ottenere il file JSON da GitHub
-        fetch('https://raw.githubusercontent.com/NOME_UTENTE/NOME_REPO/branch/percorso/al/file.json')
-            .then(response => {
-                // Controlla se la richiesta è andata a buon fine
-                if (!response.ok) {
-                    throw new Error('Errore nella richiesta HTTP: ' + response.status);
-                }
-                // Parsa la risposta JSON
-                return response.json();
-            })
-            .then(data => {
-                // Elabora i dati JSON e aggiungili al tuo HTML
-                const outputDiv = document.getElementById('output');
-                outputDiv.innerHTML = '<pre>' + JSON.stringify(data, null, 4) + '</pre>';
-            })
-            .catch(error => {
-                // Gestione degli errori
-                console.error('Si è verificato un errore:', error);
-                const outputDiv = document.getElementById('output');
-                outputDiv.innerHTML = 'Si è verificato un errore durante il recupero dei dati.';
-            });
+        // Contenuto dell'oggetto JavaScript
+        var hrData = {
+            // Contenuto di hr.js va qui
+        };
+
+        // Elabora i dati JavaScript
+        const outputDiv = document.getElementById('output');
+        outputDiv.innerHTML = '<pre>' + JSON.stringify(hrData, null, 4) + '</pre>';
     </script>
 </body>
 </html>
+
