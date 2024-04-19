@@ -13,44 +13,28 @@
         <article>
             <p id="pMain">Ready to connect</p>
             <button id="btnConnect">Connect</button>
-            <p>X: <span id="pX"></span></p>
-            <p>Y: <span id="pY"></span></p>
-            <p>Z: <span id="pZ"></span></p>
-            <p>Steps: <span id="pSteps"></span></p>
-            <p>Heart Rate: <span id="pHeartRate"></span></p>
             <p>HRM Raw: <span id="pHRMRaw"></span></p>
         </article>
     </main>
     <script>
-        var result = {
-            accel: [],
-            steps: [],
-            hrm: []
-        };
+        var result = { hrm: [] };
 
         function onLine(line) {
             try {
                 var hr_data = JSON.parse(line);
                 if (hr_data.hasOwnProperty("raw")) {
-                    var hrm_raw = {
-                        ms: hr_data.ms,
-                        raw: hr_data.raw,
-                        filt: hr_data.filt,
-                        bpm: hr_data.bpm,
-                        confidence: hr_data.confidence
-                    };
-                    updateHRMRaw(hrm_raw);
-                    result.hrm.push(hrm_raw);
+                    updateHRMRaw(hr_data.raw);
+                    result.hrm.push(hr_data);
                 }
             } catch (error) {
                 console.error("Error parsing HRM data:", error);
             }
         }
 
-        function updateHRMRaw(hrm_raw) {
+        function updateHRMRaw(raw) {
             var pHRMRaw = document.getElementById("pHRMRaw");
             if (pHRMRaw) {
-                pHRMRaw.textContent = hrm_raw.raw;
+                pHRMRaw.textContent = raw;
             }
         }
 
@@ -73,13 +57,6 @@
                     var lines = buf.split("\n");
                     buf = lines.pop();
                     lines.forEach(onLine);
-                });
-                connection.write("reset();\n", function () {
-                    setTimeout(function () {
-                        connection.write("\x03\x10if(1){" + BANGLE_CODE + "}\n", function () {
-                            console.log("Code uploaded");
-                        });
-                    }, 1500);
                 });
             });
         }
