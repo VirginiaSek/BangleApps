@@ -1,116 +1,63 @@
-<!DOCTYPE html>
-
 <html>
 <head>
-    <title>Bangle.js Data Streaming</title>
     <title>Bangle.js Data streaming</title>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <script src="https://www.puck-js.com/puck.js"></script>
     <link rel="stylesheet" href="https://cdn.rawgit.com/kimeiga/bahunya/css/bahunya-0.1.1.css" />
+    <script src="https://www.chartjs.org/dist/3.7.0/chart.min.js"></script>
 </head>
 <body>
-    <h2 style="text-align: center;">Bangle.js Data Streaming</h2>
     <script src="https://www.puck-js.com/puck.js"></script>
     <script src="deps/FileSaver.js"></script>
     <h2 style="text-align: center;">Bangle.js data streaming app</h2>
     <main>
         <article>
             <p id="pMain">Ready to connect</p>
-@@ -20,87 +22,156 @@ <h2 style="text-align: center;">Bangle.js Data Streaming</h2>
+            <button id="btnConnect">Connect</button>
+            <p>X: <span id="pX"></span></p>
+            <p>Y: <span id="pY"></span></p>
+            <p>Z: <span id="pZ"></span></p>
+            <p>Steps: <span id="pSteps"></span></p>
+            <p>Heart Rate: <span id="pHeartRate"></span></p>
+            <p>HRM Raw: <span id="pHRMRaw"></span></p>
+            <canvas id="hrmChart" width="400" height="200"></canvas>
         </article>
     </main>
     <script>
-        let connection;
-        let fileWriter;
-
-        // Funzione per inizializzare la connessione con il dispositivo Bangle.js
-        function connect() {
-            Puck.connect(function(c) {
-                if (!c) {
-                    return;
-                }
-                connection = c;
-                document.getElementById("pMain").textContent = 'Connected!';
-                document.getElementById("btnConnect").textContent = 'Disconnect';
-
-                // Inizializza il file writer
-                navigator.webkitPersistentStorage.requestQuota(1024 * 1024, function(grantedBytes) {
-                    window.requestFileSystem(PERSISTENT, grantedBytes, function(fs) {
-                        fs.root.getFile('bangle_data.bin', {create: true}, function(fileEntry) {
-                            fileEntry.createWriter(function(writer) {
-                                fileWriter = writer;
-                            }, errorHandler);
-                        }, errorHandler);
-                    }, errorHandler);
-                }, errorHandler);
-
-                // Avvia la ricezione dei dati
-                startStreaming();
-            });
-        }
         // Code to upload to Bangle.js
         var BANGLE_CODE = `
-        var start = Date.now();
-        // Funzione per avviare la ricezione dei dati dal Bangle.js
-        function startStreaming() {
-            connection.write("reset();\n", function () {
-                setTimeout(function () {
-                    connection.write(`
-                        var start = Date.now();
-                        Bangle.on('accel', function(a) {
-                            var d = new Int16Array(4);
-                            d[0] = Math.round(a.x * 1000);
-                            d[1] = Math.round(a.y * 1000);
-                            d[2] = Math.round(a.z * 1000);
-                            d[3] = Date.now() - start;
-                            fileWriter.write(d.buffer);
-                        });
-                        Bangle.on('step', function(up) {
-                            var d = new Uint16Array(2);
-                            d[0] = up ? 1 : 0;
-                            d[1] = Date.now() - start;
-                            fileWriter.write(d.buffer);
-                        });
-                        Bangle.setHRMPower(1);
-                        Bangle.on('HRM', function(hrm) {
-                            var d = new Uint16Array(2);
-                            d[0] = hrm.bpm;
-                            d[1] = Date.now() - start;
-                            fileWriter.write(d.buffer);
-                        });
-                    `, () => {
-                        console.log("Ready...");
-                    });
-                }, 1500);
-            });
-        }
-        // Funzione per gestire eventuali errori
-        function errorHandler(err) {
-            console.error('File system error:', err);
-function sendBinaryData(data) {
-  var buffer = E.toArrayBuffer(data); // Converti in ArrayBuffer
-  Bluetooth.write(buffer); // Invia dati binari
-}
+var start = Date.now();
 Bangle.on('accel', function(a) {
-  var buffer = new Int32Array(3); // 3 * 4 byte per x, y, z
-  buffer[0] = Math.round(a.x * 1000);
-  buffer[1] = Math.round(a.y * 1000);
-  buffer[2] = Math.round(a.z * 1000);
-  sendBinaryData(buffer);
+  var d = [
+    "A",
+    Date.now() - start,
+    Math.round(a.x * 1000),
+    Math.round(a.y * 1000),
+    Math.round(a.z * 1000)
+  ];
+  Bluetooth.println(d.join(","));
 });
+
 Bangle.on('step', function(up) {
-  var buffer = new Int32Array(2); // 2 * 4 byte per timestamp e steps
-  buffer[0] = Date.now() - start;
-  buffer[1] = up ? 1 : 0; // Converti il valore booleano in un byte
-  sendBinaryData(buffer);
+    var d = [
+      "S",
+      Date.now() - start,
+      up
+    ];
+    Bluetooth.println(d.join(","));
 });
+
 Bangle.setHRMPower(1);
-Bangle.on('HRM', function(hrm) {
-  var buffer = new Int32Array(2); // 2 * 4 byte per timestamp e bpm
-  buffer[0] = Date.now() - start;
-  buffer[1] = hrm.bpm;
-  sendBinaryData(buffer);
+Bangle.on('HRM-raw', function(hrm) {
+  var d = [
+    "H",
+    Date.now() - start,
+    hrm.raw,
+    hrm.filt,
+    hrm.bpm,
+    hrm.confidence
+  ];
+  Bluetooth.println(d.join(","));
 });
 `;
 
@@ -121,8 +68,16 @@ Bangle.on('HRM', function(hrm) {
         let pZ = document.getElementById("pZ");
         let pSteps = document.getElementById("pSteps");
         let pHeartRate = document.getElementById("pHeartRate");
+        let pHRMRaw = document.getElementById("pHRMRaw");
 
         let result = {};
+        let hrmChart;
+        let hrmData = {
+            time: [],
+            bpm: [],
+            confidence: [],
+            heartRate: []
+        };
 
         // detect file saving capability
         try {
@@ -133,8 +88,6 @@ Bangle.on('HRM', function(hrm) {
             btnConnect.disabled = true;
         }
 
-        // Funzione per gestire il click sul pulsante di connessione
-        document.getElementById("btnConnect").addEventListener("click", function () {
         // When we click the connect button...
         let connection;
         btnConnect.addEventListener("click", function () {
@@ -142,32 +95,29 @@ Bangle.on('HRM', function(hrm) {
             if (connection) {
                 connection.close();
                 connection = undefined;
-                document.getElementById("pMain").textContent = 'Ready to connect';
-                document.getElementById("btnConnect").textContent = 'Connect';
                 pMain.textContent = 'Ready to connect';
 
                 result.endTs = new Date();
                 console.log(result);
-              var blob = new Blob([result], { type: "application/octet-stream" });
-                let filename = 'testResults_' + Date.now() + '.raw';
+                var blob = new Blob([JSON.stringify(result)], { type: "text/json;charset=utf-8" });
 
+                let filename = 'testResults_' + Date.now() + '.json';
                 saveAs(blob, filename);
                 return;
             } else {
-                connect();
                 // Connect
                 Puck.connect(function (c) {
                     if (!c) {
                         return;
                     }
                     connection = c;
-                    pMain.textContent = 'Connected!!!!';
+                    pMain.textContent = 'Connected!';
                     btnConnect.textContent = 'Disconnect';
                     // initialise result
                     result.startTs = new Date();
                     result.accel = [];
                     result.steps = [];
-                    result.hr = [];
+                    result.hrm = [];
                     // Handle the data we get back, and call 'onLine'
                     // whenever we get a new line
                     var buf = "";
@@ -222,16 +172,78 @@ Bangle.on('HRM', function(hrm) {
 
                 result.steps.push(steps);
             }
-            if (d.length == 3 && d[0] == "H") {
+            if (d.length == 6 && d[0] == "H") {
                 // we have an HR monitor reading
-                var hr_data = {
+                var hrm_data = {
                     ms: parseInt(d[1]),
-                    hr: parseInt(d[2])
+                    raw: parseInt(d[2]),
+                    filt: parseInt(d[3]),
+                    bpm: parseFloat(d[4]),
+                    confidence: parseInt(d[5])
                 };
-                pHeartRate.textContent = hr_data.hr;
+                pHRMRaw.textContent = hrm_data.raw;
 
-                result.hr.push(hr_data);
+                // Update chart data
+                hrmData.time.push(hrm_data.ms);
+                hrmData.bpm.push(hrm_data.bpm);
+                hrmData.confidence.push(hrm_data.confidence);
+                hrmData.heartRate.push(calculateHeartRate(hrmData.bpm));
+
+                updateChart();
+                result.hrm.push(hrm_data);
             }
+        }
+
+        function updateChart() {
+            if (!hrmChart) {
+                hrmChart = new Chart(document.getElementById('hrmChart').getContext('2d'), {
+                    type: 'line',
+                    data: {
+                        labels: hrmData.time,
+                        datasets: [{
+                            label: 'BPM',
+                            data: hrmData.bpm,
+                            borderColor: 'rgb(75, 192, 192)',
+                            backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                            fill: false
+                        }, {
+                            label: 'Confidence',
+                            data: hrmData.confidence,
+                            borderColor: 'rgb(255, 99, 132)',
+                            backgroundColor: 'rgba(255, 99, 132, 0.2)',
+                            fill: false
+                        }, {
+                            label: 'Heart Rate',
+                            data: hrmData.heartRate,
+                            borderColor: 'rgb(54, 162, 235)',
+                            backgroundColor: 'rgba(54, 162, 235, 0.2)',
+                            fill: false
+                        }]
+                    },
+                    options: {
+                        scales: {
+                            x: {
+                                type: 'linear',
+                                position: 'bottom'
+                            },
+                            y: {
+                                beginAtZero: true
+                            }
+                        }
+                    }
+                });
+            } else {
+                hrmChart.data.labels = hrmData.time;
+                hrmChart.data.datasets[0].data = hrmData.bpm;
+                hrmChart.data.datasets[1].data = hrmData.confidence;
+                hrmChart.data.datasets[2].data = hrmData.heartRate;
+                hrmChart.update();
+            }
+        }
+
+        function calculateHeartRate(bpmData) {
+            if (bpmData.length === 0) return 0;
+            return bpmData.reduce((a, b) => a + b) / bpmData.length;
         }
     </script>
 </body>
