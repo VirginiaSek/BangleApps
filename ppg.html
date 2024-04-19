@@ -18,7 +18,7 @@
             <p>Z: <span id="pZ"></span></p>
             <p>Steps: <span id="pSteps"></span></p>
             <p>Heart Rate: <span id="pHeartRate"></span></p>
-            <p>PPG Raw: <span id="pPPGRaw"></span></p>
+            <p>HRM Raw: <span id="pHRMRaw"></span></p>
         </article>
     </main>
     <script>
@@ -50,16 +50,10 @@ Bangle.on('HRM', function(hrm) {
   var d = [
     "H",
     Date.now() - start,
-    hrm.bpm
-  ];
-  Bluetooth.println(d.join(","));
-});
-
-Bangle.on('PPG', function(ppg) {
-  var d = [
-    "P",
-    Date.now() - start,
-    ppg.raw
+    hrm.raw,
+    hrm.filt,
+    hrm.bpm,
+    hrm.confidence
   ];
   Bluetooth.println(d.join(","));
 });
@@ -72,7 +66,7 @@ Bangle.on('PPG', function(ppg) {
         let pZ = document.getElementById("pZ");
         let pSteps = document.getElementById("pSteps");
         let pHeartRate = document.getElementById("pHeartRate");
-        let pPPGRaw = document.getElementById("pPPGRaw");
+        let pHRMRaw = document.getElementById("pHRMRaw");
 
         let result = {};
 
@@ -114,8 +108,7 @@ Bangle.on('PPG', function(ppg) {
                     result.startTs = new Date();
                     result.accel = [];
                     result.steps = [];
-                    result.hr = [];
-                    result.ppg = [];
+                    result.hrm = [];
                     // Handle the data we get back, and call 'onLine'
                     // whenever we get a new line
                     var buf = "";
@@ -170,27 +163,21 @@ Bangle.on('PPG', function(ppg) {
 
                 result.steps.push(steps);
             }
-            if (d.length == 3 && d[0] == "H") {
+            if (d.length == 6 && d[0] == "H") {
                 // we have an HR monitor reading
-                var hr_data = {
+                var hrm_data = {
                     ms: parseInt(d[1]),
-                    hr: parseInt(d[2])
+                    raw: parseInt(d[2]),
+                    filt: parseInt(d[3]),
+                    bpm: parseFloat(d[4]),
+                    confidence: parseInt(d[5])
                 };
-                pHeartRate.textContent = hr_data.hr;
+                pHRMRaw.textContent = hrm_data.raw;
 
-                result.hr.push(hr_data);
-            }
-            if (d.length == 3 && d[0] == "P") {
-                // we have PPG raw reading
-                var ppg_raw = {
-                    ms: parseInt(d[1]),
-                    raw: parseInt(d[2])
-                };
-                pPPGRaw.textContent = ppg_raw.raw;
-
-                result.ppg.push(ppg_raw);
+                result.hrm.push(hrm_data);
             }
         }
     </script>
 </body>
 </html>
+
