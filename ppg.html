@@ -20,6 +20,7 @@
         var result = { hrm: [] };
 
         function onLine(line) {
+            console.log("Received line:", line);
             try {
                 var hr_data = JSON.parse(line);
                 if (hr_data.hasOwnProperty("raw")) {
@@ -48,15 +49,13 @@
         function connect() {
             Puck.connect(function (connection) {
                 if (!connection) {
+                    console.error("Connection failed");
                     return;
                 }
                 updateMainText('Connected!');
-                var buf = "";
                 connection.on("data", function (data) {
-                    buf += data;
-                    var lines = buf.split("\n");
-                    buf = lines.pop();
-                    lines.forEach(onLine);
+                    console.log("Received data:", data);
+                    onLine(data);
                 });
             });
         }
