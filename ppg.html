@@ -49,7 +49,7 @@ Bangle.setHRMPower(1);
 Bangle.on('HRM-raw', function(hrm) {
   var d = [
     "H",
-    hrm.ms,
+    Date.now() - start,
     hrm.raw,
     hrm.filt,
     hrm.bpm,
@@ -137,23 +137,44 @@ Bangle.on('HRM-raw', function(hrm) {
         // When we get a line of data, check it and if it's
         // from the accelerometer, update it
         function onLine(line) {
-            try {
-                var hr_data = JSON.parse(line);
-                if (hr_data.hasOwnProperty("raw")) {
-                    // we have an HR monitor reading
-                    var hrm_raw = {
-                        ms: hr_data.ms,
-                        raw: hr_data.raw,
-                        filt: hr_data.filt,
-                        bpm: hr_data.bpm,
-                        confidence: hr_data.confidence
-                    };
-                    pHRMRaw.textContent = hrm_raw.raw;
+            // console.log("RECEIVED:" + line);
+            var d = line.split(",");
+            if (d.length == 5 && d[0] == "A") {
+                // we have an accelerometer reading
+                var accel = {
+                    ms: parseInt(d[1]),
+                    x: parseInt(d[2]),
+                    y: parseInt(d[3]),
+                    z: parseInt(d[4])
+                };
+                pX.textContent = accel.x;
+                pY.textContent = accel.y;
+                pZ.textContent = accel.z;
 
-                    result.hrm.push(hrm_raw);
-                }
-            } catch (error) {
-                console.error("Error parsing HRM data:", error);
+                result.accel.push(accel);
+            }
+            if (d.length == 3 && d[0] == "S") {
+                // we have steps reading
+                var steps = {
+                    ms: parseInt(d[1]),
+                    steps: parseInt(d[2])
+                };
+                pSteps.textContent = steps.steps;
+
+                result.steps.push(steps);
+            }
+            if (d.length == 6 && d[0] == "H") {
+                // we have an HR monitor reading
+                var hrm_data = {
+                    ms: parseInt(d[1]),
+                    raw: parseInt(d[2]),
+                    filt: parseInt(d[3]),
+                    bpm: parseFloat(d[4]),
+                    confidence: parseInt(d[5])
+                };
+                pHRMRaw.textContent = hrm_data.raw;
+
+                result.hrm.push(hrm_data);
             }
         }
     </script>
