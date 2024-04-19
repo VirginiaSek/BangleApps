@@ -22,145 +22,89 @@
         </article>
     </main>
     <script>
-        // Code to upload to Bangle.js
-        var BANGLE_CODE = `
-var start = Date.now();
-Bangle.on('accel', function(a) {
-  var d = [
-    "A",
-    Date.now() - start,
-    Math.round(a.x * 1000),
-    Math.round(a.y * 1000),
-    Math.round(a.z * 1000)
-  ];
-  Bluetooth.println(d.join(","));
-});
+        var result = {
+            accel: [],
+            steps: [],
+            hrm: []
+        };
 
-Bangle.on('step', function(up) {
-    var d = [
-      "S",
-      Date.now() - start,
-      up
-    ];
-    Bluetooth.println(d.join(","));
-});
-
-Bangle.setHRMPower(1);
-Bangle.on('HRM-raw', function(hrm) {
-  var d = [
-    "H",
-    hrm.ms,
-    hrm.raw,
-    hrm.filt,
-    hrm.bpm,
-    hrm.confidence
-  ];
-  Bluetooth.println(d.join(","));
-});
-`;
-
-        let pMain = document.getElementById("pMain");
-        let btnConnect = document.getElementById("btnConnect");
-        let pX = document.getElementById("pX");
-        let pY = document.getElementById("pY");
-        let pZ = document.getElementById("pZ");
-        let pSteps = document.getElementById("pSteps");
-        let pHeartRate = document.getElementById("pHeartRate");
-        let pHRMRaw = document.getElementById("pHRMRaw");
-
-        let result = {};
-
-        // detect file saving capability
-        try {
-            new Blob;
-        } catch (e) {
-            console.error(e);
-            pMain.textContent = 'File saving not supported';
-            btnConnect.disabled = true;
+        function onLine(line) {
+            try {
+                var hr_data = JSON.parse(line);
+                if (hr_data.hasOwnProperty("raw")) {
+                    var hrm_raw = {
+                        ms: hr_data.ms,
+                        raw: hr_data.raw,
+                        filt: hr_data.filt,
+                        bpm: hr_data.bpm,
+                        confidence: hr_data.confidence
+                    };
+                    updateHRMRaw(hrm_raw);
+                    result.hrm.push(hrm_raw);
+                }
+            } catch (error) {
+                console.error("Error parsing HRM data:", error);
+            }
         }
 
-        // When we click the connect button...
-        let connection;
-        btnConnect.addEventListener("click", function () {
-            // disconnect if connected already
+        function updateHRMRaw(hrm_raw) {
+            var pHRMRaw = document.getElementById("pHRMRaw");
+            if (pHRMRaw) {
+                pHRMRaw.textContent = hrm_raw.raw;
+            }
+        }
+
+        function updateMainText(text) {
+            var pMain = document.getElementById("pMain");
+            if (pMain) {
+                pMain.textContent = text;
+            }
+        }
+
+        function connect() {
+            Puck.connect(function (connection) {
+                if (!connection) {
+                    return;
+                }
+                updateMainText('Connected!');
+                var buf = "";
+                connection.on("data", function (data) {
+                    buf += data;
+                    var lines = buf.split("\n");
+                    buf = lines.pop();
+                    lines.forEach(onLine);
+                });
+                connection.write("reset();\n", function () {
+                    setTimeout(function () {
+                        connection.write("\x03\x10if(1){" + BANGLE_CODE + "}\n", function () {
+                            console.log("Code uploaded");
+                        });
+                    }, 1500);
+                });
+            });
+        }
+
+        function disconnect(connection) {
             if (connection) {
                 connection.close();
-                connection = undefined;
-                pMain.textContent = 'Ready to connect';
-
-                result.endTs = new Date();
-                console.log(result);
+                updateMainText('Ready to connect');
                 var blob = new Blob([JSON.stringify(result)], { type: "text/json;charset=utf-8" });
-
-                let filename = 'testResults_' + Date.now() + '.json';
+                var filename = 'testResults_' + Date.now() + '.json';
                 saveAs(blob, filename);
-                return;
-            } else {
-                // Connect
-                Puck.connect(function (c) {
-                    if (!c) {
-                        return;
-                    }
-                    connection = c;
-                    pMain.textContent = 'Connected!';
-                    btnConnect.textContent = 'Disconnect';
-                    // initialise result
-                    result.startTs = new Date();
-                    result.accel = [];
-                    result.steps = [];
-                    result.hrm = [];
-                    // Handle the data we get back, and call 'onLine'
-                    // whenever we get a new line
-                    var buf = "";
-                    connection.on("data", function (d) {
-                        buf += d;
-                        var l = buf.split("\n");
-                        buf = l.pop();
-                        l.forEach(onLine);
-                    });
-
-                    // First, reset the Bangle
-                    connection.write("reset();\n", function () {
-                        // Wait for it to reset itself
-                        setTimeout(function () {
-                            // Now upload our code to it
-                            connection.write("\x03\x10if(1){" + BANGLE_CODE + "}\n",
-                                () => {
-                                    console.log("Ready...");
-                                });
-                        }, 1500);
-                    });
-                });
             }
-        });
-
-        // When we get a line of data, check it and if it's
-        // from the accelerometer, update it
-        // When we get a line of data, check it and if it's
-       // from the accelerometer, update it
-function onLine(line) {
-    try {
-        console.log("Received line:", line);
-        var hr_data = JSON.parse(line);
-        console.log("Parsed data:", hr_data);
-        if (hr_data.hasOwnProperty("raw")) {
-            // we have an HR monitor reading
-            var hrm_raw = {
-                ms: hr_data.ms,
-                raw: hr_data.raw,
-                filt: hr_data.filt,
-                bpm: hr_data.bpm,
-                confidence: hr_data.confidence
-            };
-            pHRMRaw.textContent = hrm_raw.raw;
-
-            result.hrm.push(hrm_raw);
         }
-    } catch (error) {
-        console.error("Error parsing HRM data:", error);
-    }
-}
 
+        var btnConnect = document.getElementById("btnConnect");
+        btnConnect.addEventListener("click", function () {
+            var connection;
+            if (btnConnect.textContent === 'Disconnect') {
+                disconnect(connection);
+                connection = undefined;
+            } else {
+                connect();
+            }
+            btnConnect.textContent = (btnConnect.textContent === 'Disconnect') ? 'Connect' : 'Disconnect';
+        });
 
     </script>
 </body>
