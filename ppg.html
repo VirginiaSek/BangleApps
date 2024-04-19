@@ -136,26 +136,31 @@ Bangle.on('HRM-raw', function(hrm) {
 
         // When we get a line of data, check it and if it's
         // from the accelerometer, update it
-        function onLine(line) {
-            try {
-                var hr_data = JSON.parse(line);
-                if (hr_data.hasOwnProperty("raw")) {
-                    // we have an HR monitor reading
-                    var hrm_raw = {
-                        ms: hr_data.ms,
-                        raw: hr_data.raw,
-                        filt: hr_data.filt,
-                        bpm: hr_data.bpm,
-                        confidence: hr_data.confidence
-                    };
-                    pHRMRaw.textContent = hrm_raw.raw;
+// When we get a line of data, check it and if it's
+// from the accelerometer, update it
+function onLine(line) {
+    try {
+        console.log("Received line:", line);
+        var hr_data = JSON.parse(line);
+        console.log("Parsed data:", hr_data);
+        if (hr_data.hasOwnProperty("raw")) {
+            // we have an HR monitor reading
+            var hrm_raw = {
+                ms: hr_data.ms,
+                raw: hr_data.raw,
+                filt: hr_data.filt,
+                bpm: hr_data.bpm,
+                confidence: hr_data.confidence
+            };
+            pHRMRaw.textContent = hrm_raw.raw;
 
-                    result.hrm.push(hrm_raw);
-                }
-            } catch (error) {
-                console.error("Error parsing HRM data:", error);
-            }
+            result.hrm.push(hrm_raw);
         }
+    } catch (error) {
+        console.error("Error parsing HRM data:", error);
+    }
+}
+
     </script>
 </body>
 </html>
