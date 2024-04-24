@@ -15,39 +15,30 @@
         </article>
     </main>
     <script>
-        // Codice per la connessione e l'acquisizione dei dati dalla Polar H10
-        // (Questo è solo un esempio generico e potrebbe non funzionare direttamente con la Polar H10)
-
         let pMain = document.getElementById("pMain");
         let btnConnect = document.getElementById("btnConnect");
         let pHeartRate = document.getElementById("pHeartRate");
 
-        let result = {};
-
-        // When we click the connect button...
         let device;
+        let heartRateData = [];
+
         btnConnect.addEventListener("click", function () {
-            // Disconnect if already connected
             if (device && device.gatt.connected) {
                 device.gatt.disconnect();
                 device = undefined;
                 pMain.textContent = 'Ready to connect';
                 return;
             } else {
-                // Connect
                 connectToPolarH10();
             }
         });
 
-        // Function to connect to Polar H10 via Bluetooth
         async function connectToPolarH10() {
             try {
-                pMain.textContent = 'Connecting...';
+                pMain.textContent = 'Scanning for devices...';
                 device = await navigator.bluetooth.requestDevice({
-                    filters: [{ name: 'Polar H10', services: ['heart_rate'] }],
-                    optionalServices: ['heart_rate'],
-                    acceptAllDevices: false,
-                    deviceId: 'D316F329' // Specific ID of the Polar H10
+                    filters: [{ services: ['heart_rate'] }],
+                    optionalServices: ['heart_rate']
                 });
                 await device.gatt.connect();
                 pMain.textContent = 'Connected!';
@@ -58,7 +49,6 @@
             }
         }
 
-        // Setup event listener for heart rate data received from Polar H10
         function setupPolarH10Listener() {
             if (!device || !device.gatt.connected) {
                 console.error('Device not connected');
@@ -75,13 +65,34 @@
             });
         }
 
-        // Function to handle received heart rate data from Polar H10
         function handleHeartRateData(event) {
             let value = event.target.value;
             let heartRate = value.getUint8(1);
             pHeartRate.textContent = heartRate;
+            heartRateData.push({ timestamp: new Date().toISOString(), heartRate: heartRate });
+        }
+
+        window.addEventListener('beforeunload', function () {
+            if (device && device.gatt.connected) {
+                device.gatt.disconnect();
+            }
+            if (heartRateData.length > 0) {
+                saveHeartRateDataToFile(heartRateData);
+            }
+        });
+
+        function saveHeartRateDataToFile(data) {
+            let json = JSON.stringify(data, null, 2);
+            let blob = new Blob([json], { type: 'application/json' });
+            let url = URL.createObjectURL(blob);
+
+            let a = document.createElement('a');
+            a.href = url;
+            a.download = 'heart_rate_data.json';
+            a.click();
+
+            URL.revokeObjectURL(url);
         }
     </script>
 </body>
 </html>
-
