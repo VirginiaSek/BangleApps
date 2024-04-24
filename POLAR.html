@@ -1,0 +1,159 @@
+<html>
+<head>
+    <title>Bangle.js Data streaming</title>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="stylesheet" href="https://cdn.rawgit.com/kimeiga/bahunya/css/bahunya-0.1.1.css" />
+</head>
+<body>
+    <script src="https://www.puck-js.com/puck.js"></script>
+    <script src="deps/FileSaver.js"></script>
+    <h2 style="text-align: center;">Bangle.js data streaming app</h2>
+    <main>
+        <article>
+            <p id="pMain">Ready to connect</p>
+            <button id="btnConnect">Connect</button>
+            <div id="dataHistory"></div>
+        </article>
+    </main>
+    <script>
+        var BANGLE_CODE = `
+var start = Date.now();
+Bangle.on('accel', function(a) {
+  var d = [
+    "A",
+    Date.now() - start,
+    Math.round(a.x * 1000),
+    Math.round(a.y * 1000),
+    Math.round(a.z * 1000)
+  ];
+  Bluetooth.println(d.join(","));
+});
+
+Bangle.on('step', function(up) {
+    var d = [
+      "S",
+      Date.now() - start,
+      up
+    ];
+    Bluetooth.println(d.join(","));
+});
+
+Bangle.setHRMPower(1);
+Bangle.on('HRM', function(hrm) {
+  var d = [
+    "H",
+    Date.now() - start,
+    hrm.bpm
+  ];
+  Bluetooth.println(d.join(","));
+});
+`;
+
+        let pMain = document.getElementById("pMain");
+        let btnConnect = document.getElementById("btnConnect");
+        let dataHistory = document.getElementById("dataHistory");
+
+        let connection;
+        let result = {
+            accel: [],
+            steps: [],
+            hr: []
+        };
+
+        try {
+            new Blob;
+        } catch (e) {
+            console.error(e);
+            pMain.textContent = 'File saving not supported';
+            btnConnect.disabled = true;
+        }
+
+        btnConnect.addEventListener("click", function () {
+            if (connection) {
+                connection.close();
+                connection = undefined;
+                pMain.textContent = 'Ready to connect';
+
+                result.endTs = new Date();
+                console.log(result);
+                var blob = new Blob([JSON.stringify(result)], { type: "text/json;charset=utf-8" });
+
+                let filename = 'testResults_' + Date.now() + '.json';
+                saveAs(blob, filename);
+                return;
+            } else {
+                Puck.connect(function (c) {
+                    if (!c) {
+                        return;
+                    }
+                    connection = c;
+                    pMain.textContent = 'Connected!';
+                    btnConnect.textContent = 'Disconnect';
+
+                    var buf = "";
+                    connection.on("data", function (d) {
+                        buf += d;
+                        var l = buf.split("\n");
+                        buf = l.pop();
+                        l.forEach(onLine);
+                    });
+
+                    connection.write("reset();\n", function () {
+                        setTimeout(function () {
+                            connection.write("\x03\x10if(1){" + BANGLE_CODE + "}\n",
+                                () => {
+                                    console.log("Ready...");
+                                });
+                        }, 1500);
+                    });
+                });
+            }
+        });
+
+        function onLine(line) {
+            var d = line.split(",");
+            if (d.length >= 3 && d[0] === "A") {
+                result.accel.push({
+                    timestamp: parseInt(d[1]),
+                    x: parseInt(d[2]),
+                    y: parseInt(d[3]),
+                    z: parseInt(d[4])
+                });
+            }
+            if (d.length === 3 && d[0] === "S") {
+                result.steps.push({
+                    timestamp: parseInt(d[1]),
+                    steps: parseInt(d[2])
+                });
+            }
+            if (d.length === 3 && d[0] === "H") {
+                result.hr.push({
+                    timestamp: parseInt(d[1]),
+                    bpm: parseInt(d[2])
+                });
+            }
+            updateDataHistory();
+        }
+
+        function updateDataHistory() {
+            dataHistory.innerHTML = "";
+            dataHistory.innerHTML += "<h3>Acceleration</h3>";
+            result.accel.forEach(function (entry) {
+                dataHistory.innerHTML += "<p>X: " + entry.x + ", Y: " + entry.y + ", Z: " + entry.z + ", Timestamp: " + entry.timestamp + "</p>";
+            });
+
+            dataHistory.innerHTML += "<h3>Steps</h3>";
+            result.steps.forEach(function (entry) {
+                dataHistory.innerHTML += "<p>Steps: " + entry.steps + ", Timestamp: " + entry.timestamp + "</p>";
+            });
+
+            dataHistory.innerHTML += "<h3>Heart Rate</h3>";
+            result.hr.forEach(function (entry) {
+                dataHistory.innerHTML += "<p>Heart Rate: " + entry.bpm + ", Timestamp: " + entry.timestamp + "</p>";
+            });
+        }
+    </script>
+</body>
+</html>
+
