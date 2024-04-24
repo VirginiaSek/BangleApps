@@ -1,157 +1,85 @@
 <html>
 <head>
-    <title>Bangle.js Data streaming</title>
+    <title>Polar H10 Heart Rate Data Streaming</title>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <link rel="stylesheet" href="https://cdn.rawgit.com/kimeiga/bahunya/css/bahunya-0.1.1.css" />
 </head>
 <body>
-    <script src="https://www.puck-js.com/puck.js"></script>
-    <script src="deps/FileSaver.js"></script>
-    <h2 style="text-align: center;">Bangle.js data streaming app</h2>
+    <h2 style="text-align: center;">Polar H10 Heart Rate Data Streaming</h2>
     <main>
         <article>
             <p id="pMain">Ready to connect</p>
             <button id="btnConnect">Connect</button>
-            <div id="dataHistory"></div>
+            <p>Heart Rate: <span id="pHeartRate"></span></p>
         </article>
     </main>
     <script>
-        var BANGLE_CODE = `
-var start = Date.now();
-Bangle.on('accel', function(a) {
-  var d = [
-    "A",
-    Date.now() - start,
-    Math.round(a.x * 1000),
-    Math.round(a.y * 1000),
-    Math.round(a.z * 1000)
-  ];
-  Bluetooth.println(d.join(","));
-});
-
-Bangle.on('step', function(up) {
-    var d = [
-      "S",
-      Date.now() - start,
-      up
-    ];
-    Bluetooth.println(d.join(","));
-});
-
-Bangle.setHRMPower(1);
-Bangle.on('HRM', function(hrm) {
-  var d = [
-    "H",
-    Date.now() - start,
-    hrm.bpm
-  ];
-  Bluetooth.println(d.join(","));
-});
-`;
+        // Codice per la connessione e l'acquisizione dei dati dalla Polar H10
+        // (Questo è solo un esempio generico e potrebbe non funzionare direttamente con la Polar H10)
 
         let pMain = document.getElementById("pMain");
         let btnConnect = document.getElementById("btnConnect");
-        let dataHistory = document.getElementById("dataHistory");
+        let pHeartRate = document.getElementById("pHeartRate");
 
-        let connection;
-        let result = {
-            accel: [],
-            steps: [],
-            hr: []
-        };
+        let result = {};
 
-        try {
-            new Blob;
-        } catch (e) {
-            console.error(e);
-            pMain.textContent = 'File saving not supported';
-            btnConnect.disabled = true;
-        }
-
+        // When we click the connect button...
+        let device;
         btnConnect.addEventListener("click", function () {
-            if (connection) {
-                connection.close();
-                connection = undefined;
+            // Disconnect if already connected
+            if (device && device.gatt.connected) {
+                device.gatt.disconnect();
+                device = undefined;
                 pMain.textContent = 'Ready to connect';
-
-                result.endTs = new Date();
-                console.log(result);
-                var blob = new Blob([JSON.stringify(result)], { type: "text/json;charset=utf-8" });
-
-                let filename = 'testResults_' + Date.now() + '.json';
-                saveAs(blob, filename);
                 return;
             } else {
-                Puck.connect(function (c) {
-                    if (!c) {
-                        return;
-                    }
-                    connection = c;
-                    pMain.textContent = 'Connected!';
-                    btnConnect.textContent = 'Disconnect';
-
-                    var buf = "";
-                    connection.on("data", function (d) {
-                        buf += d;
-                        var l = buf.split("\n");
-                        buf = l.pop();
-                        l.forEach(onLine);
-                    });
-
-                    connection.write("reset();\n", function () {
-                        setTimeout(function () {
-                            connection.write("\x03\x10if(1){" + BANGLE_CODE + "}\n",
-                                () => {
-                                    console.log("Ready...");
-                                });
-                        }, 1500);
-                    });
-                });
+                // Connect
+                connectToPolarH10();
             }
         });
 
-        function onLine(line) {
-            var d = line.split(",");
-            if (d.length >= 3 && d[0] === "A") {
-                result.accel.push({
-                    timestamp: parseInt(d[1]),
-                    x: parseInt(d[2]),
-                    y: parseInt(d[3]),
-                    z: parseInt(d[4])
+        // Function to connect to Polar H10 via Bluetooth
+        async function connectToPolarH10() {
+            try {
+                pMain.textContent = 'Connecting...';
+                device = await navigator.bluetooth.requestDevice({
+                    filters: [{ name: 'Polar H10', services: ['heart_rate'] }],
+                    optionalServices: ['heart_rate'],
+                    acceptAllDevices: false,
+                    deviceId: 'D316F329' // Specific ID of the Polar H10
                 });
+                await device.gatt.connect();
+                pMain.textContent = 'Connected!';
+                setupPolarH10Listener();
+            } catch (error) {
+                console.error('Error connecting to Polar H10:', error);
+                pMain.textContent = 'Error connecting';
             }
-            if (d.length === 3 && d[0] === "S") {
-                result.steps.push({
-                    timestamp: parseInt(d[1]),
-                    steps: parseInt(d[2])
-                });
-            }
-            if (d.length === 3 && d[0] === "H") {
-                result.hr.push({
-                    timestamp: parseInt(d[1]),
-                    bpm: parseInt(d[2])
-                });
-            }
-            updateDataHistory();
         }
 
-        function updateDataHistory() {
-            dataHistory.innerHTML = "";
-            dataHistory.innerHTML += "<h3>Acceleration</h3>";
-            result.accel.forEach(function (entry) {
-                dataHistory.innerHTML += "<p>X: " + entry.x + ", Y: " + entry.y + ", Z: " + entry.z + ", Timestamp: " + entry.timestamp + "</p>";
-            });
+        // Setup event listener for heart rate data received from Polar H10
+        function setupPolarH10Listener() {
+            if (!device || !device.gatt.connected) {
+                console.error('Device not connected');
+                return;
+            }
 
-            dataHistory.innerHTML += "<h3>Steps</h3>";
-            result.steps.forEach(function (entry) {
-                dataHistory.innerHTML += "<p>Steps: " + entry.steps + ", Timestamp: " + entry.timestamp + "</p>";
+            device.gatt.getPrimaryService('heart_rate').then(service => {
+                service.getCharacteristic('heart_rate_measurement').then(characteristic => {
+                    characteristic.addEventListener('characteristicvaluechanged', handleHeartRateData);
+                    characteristic.startNotifications();
+                });
+            }).catch(error => {
+                console.error('Error setting up notifications:', error);
             });
+        }
 
-            dataHistory.innerHTML += "<h3>Heart Rate</h3>";
-            result.hr.forEach(function (entry) {
-                dataHistory.innerHTML += "<p>Heart Rate: " + entry.bpm + ", Timestamp: " + entry.timestamp + "</p>";
-            });
+        // Function to handle received heart rate data from Polar H10
+        function handleHeartRateData(event) {
+            let value = event.target.value;
+            let heartRate = value.getUint8(1);
+            pHeartRate.textContent = heartRate;
         }
     </script>
 </body>
