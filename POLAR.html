@@ -1,4 +1,5 @@
-<html>
+<!DOCTYPE html>
+<html lang="en">
 <head>
     <title>Polar H10 Heart Rate Data Streaming</title>
     <meta charset="UTF-8" />
@@ -12,44 +13,91 @@
             <p id="pMain">Ready to connect</p>
             <button id="btnConnect">Connect</button>
             <p>Heart Rate: <span id="pHeartRate"></span></p>
+            <button id="btnDownload">Download Data</button>
         </article>
+        <!-- Aggiungi un div per il grafico -->
+        <div id="graph"></div>
+        <!-- Aggiungi un div per visualizzare il valore dell'heart rate corrente -->
+        <div id="currentHeartRate"></div>
     </main>
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
     <script>
-        let pMain = document.getElementById("pMain");
-        let btnConnect = document.getElementById("btnConnect");
-        let pHeartRate = document.getElementById("pHeartRate");
-
-        let device;
+        // Variabili globali per i dati dell'heart rate
         let heartRateData = [];
 
-        btnConnect.addEventListener("click", function () {
-            if (device && device.gatt.connected) {
-                device.gatt.disconnect();
-                device = undefined;
-                pMain.textContent = 'Ready to connect';
-                return;
-            } else {
-                connectToPolarH10();
-            }
-        });
+        // Funzione per creare il grafico di streaming
+        function createStreamingGraph() {
+            // Configurazione del grafico
+            var layout = {
+                xaxis: {
+                    title: 'Time'
+                },
+                yaxis: {
+                    title: 'Heart Rate'
+                },
+                showlegend: false
+            };
 
+            var config = {
+                responsive: true
+            };
+
+            // Creazione del grafico vuoto
+            var graph = Plotly.newPlot('graph', [], layout, config);
+
+            // Funzione per aggiornare il grafico con i nuovi dati
+            function updateGraph(data) {
+                // Estrae i timestamp e i valori dell'heart rate dai dati
+                var timestamps = data.map(entry => new Date(entry.timestamp).getTime());
+                var heartRates = data.map(entry => entry.heartRate);
+
+                // Aggiorna il grafico
+                Plotly.relayout('graph', {
+                    xaxis: {
+                        range: [Math.min(...timestamps), Math.max(...timestamps)]
+                    }
+                });
+                Plotly.restyle('graph', {
+                    x: [timestamps],
+                    y: [heartRates]
+                });
+            }
+
+            // Richiama la funzione per aggiornare il grafico con i dati attuali
+            updateGraph(heartRateData);
+        }
+
+        // Funzione per gestire i dati dell'heart rate ricevuti dalla Polar H10
+        function handleHeartRateData(event) {
+            let value = event.target.value;
+            let heartRate = value.getUint8(1);
+            let timestamp = new Date().toISOString();
+            let dataEntry = { timestamp: timestamp, heartRate: heartRate };
+            heartRateData.push(dataEntry);
+            document.getElementById("pHeartRate").textContent = heartRate;
+            document.getElementById("currentHeartRate").textContent = "Current Heart Rate: " + heartRate + " bpm";
+            createStreamingGraph();
+        }
+
+        // Funzione per connettersi alla Polar H10
         async function connectToPolarH10() {
             try {
-                pMain.textContent = 'Scanning for devices...';
-                device = await navigator.bluetooth.requestDevice({
+                document.getElementById("pMain").textContent = 'Scanning for devices...';
+                let device = await navigator.bluetooth.requestDevice({
                     filters: [{ services: ['heart_rate'] }],
                     optionalServices: ['heart_rate']
                 });
                 await device.gatt.connect();
-                pMain.textContent = 'Connected!';
-                setupPolarH10Listener();
+                document.getElementById("pMain").textContent = 'Connected!';
+                setupPolarH10Listener(device);
             } catch (error) {
                 console.error('Error connecting to Polar H10:', error);
-                pMain.textContent = 'Error connecting';
+                document.getElementById("pMain").textContent = 'Error connecting';
             }
         }
 
-        function setupPolarH10Listener() {
+        // Funzione per configurare il listener per i dati dell'heart rate dalla Polar H10
+        function setupPolarH10Listener(device) {
             if (!device || !device.gatt.connected) {
                 console.error('Device not connected');
                 return;
@@ -65,24 +113,23 @@
             });
         }
 
-        function handleHeartRateData(event) {
-            let value = event.target.value;
-            let heartRate = value.getUint8(1);
-            pHeartRate.textContent = heartRate;
-            heartRateData.push({ timestamp: new Date().toISOString(), heartRate: heartRate });
-        }
-
-        window.addEventListener('beforeunload', function () {
-            if (device && device.gatt.connected) {
+        // Gestione del click sul pulsante "Connect"
+        document.getElementById("btnConnect").addEventListener("click", function () {
+            let btnConnect = document.getElementById("btnConnect");
+            if (btnConnect.textContent === "Connect") {
+                connectToPolarH10();
+                btnConnect.textContent = "Disconnect";
+            } else {
+                let device = navigator.bluetooth.getDevice();
                 device.gatt.disconnect();
-            }
-            if (heartRateData.length > 0) {
-                saveHeartRateDataToFile(heartRateData);
+                btnConnect.textContent = "Connect";
+                document.getElementById("pMain").textContent = "Ready to connect";
             }
         });
 
-        function saveHeartRateDataToFile(data) {
-            let json = JSON.stringify(data, null, 2);
+        // Gestione del click sul pulsante "Download Data"
+        document.getElementById("btnDownload").addEventListener('click', function () {
+            let json = JSON.stringify(heartRateData, null, 2);
             let blob = new Blob([json], { type: 'application/json' });
             let url = URL.createObjectURL(blob);
 
@@ -92,7 +139,14 @@
             a.click();
 
             URL.revokeObjectURL(url);
-        }
+        });
+
+        // Chiama la funzione per creare il grafico di streaming quando la pagina è completamente caricata
+        document.addEventListener('DOMContentLoaded', function() {
+            createStreamingGraph();
+        });
     </script>
 </body>
 </html>
+
+
