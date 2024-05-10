@@ -4,6 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <link rel="stylesheet" href="https://cdn.rawgit.com/kimeiga/bahunya/css/bahunya-0.1.1.css" />
+    <script src="https://www.chartjs.org/dist/3.7.0/chart.min.js"></script>
 </head>
 <body>
     <script src="https://www.puck-js.com/puck.js"></script>
@@ -18,7 +19,8 @@
             <p>Z: <span id="pZ"></span></p>
             <p>Steps: <span id="pSteps"></span></p>
             <p>Heart Rate: <span id="pHeartRate"></span></p>
-            <p>PPG Raw: <span id="pPPGRaw"></span></p>
+            <p>HRM Raw: <span id="pHRMRaw"></span></p>
+            <canvas id="hrmChart" width="400" height="200"></canvas>
         </article>
     </main>
     <script>
@@ -29,9 +31,9 @@ Bangle.on('accel', function(a) {
   var d = [
     "A",
     Date.now() - start,
-    Math.round(a.x * 1000),
-    Math.round(a.y * 1000),
-    Math.round(a.z * 1000)
+    Math.round(a.x * 8192),
+    Math.round(a.y * 8192),
+    Math.round(a.z * 8192)
   ];
   Bluetooth.println(d.join(","));
 });
@@ -46,20 +48,12 @@ Bangle.on('step', function(up) {
 });
 
 Bangle.setHRMPower(1);
-Bangle.on('HRM', function(hrm) {
+Bangle.on('HRM-raw', function(hrm) {
   var d = [
     "H",
     Date.now() - start,
+    hrm.raw,
     hrm.bpm
-  ];
-  Bluetooth.println(d.join(","));
-});
-
-Bangle.on('PPG', function(ppg) {
-  var d = [
-    "P",
-    Date.now() - start,
-    ppg.raw
   ];
   Bluetooth.println(d.join(","));
 });
@@ -72,9 +66,16 @@ Bangle.on('PPG', function(ppg) {
         let pZ = document.getElementById("pZ");
         let pSteps = document.getElementById("pSteps");
         let pHeartRate = document.getElementById("pHeartRate");
-        let pPPGRaw = document.getElementById("pPPGRaw");
+        let pHRMRaw = document.getElementById("pHRMRaw");
 
         let result = {};
+        let hrmChart;
+        let hrmData = {
+            time: [],
+            bpm: [],
+            confidence: [],
+            heartRate: []
+        };
 
         // detect file saving capability
         try {
@@ -114,8 +115,7 @@ Bangle.on('PPG', function(ppg) {
                     result.startTs = new Date();
                     result.accel = [];
                     result.steps = [];
-                    result.hr = [];
-                    result.ppg = [];
+                    result.hrm = [];
                     // Handle the data we get back, and call 'onLine'
                     // whenever we get a new line
                     var buf = "";
@@ -170,26 +170,75 @@ Bangle.on('PPG', function(ppg) {
 
                 result.steps.push(steps);
             }
-            if (d.length == 3 && d[0] == "H") {
+            if (d.length == 6 && d[0] == "H") {
                 // we have an HR monitor reading
-                var hr_data = {
+                var hrm_data = {
                     ms: parseInt(d[1]),
-                    hr: parseInt(d[2])
+                    raw: parseInt(d[2]),
+                    bpm: parseFloat(d[3]),
                 };
-                pHeartRate.textContent = hr_data.hr;
+                pHRMRaw.textContent = hrm_data.raw;
 
-                result.hr.push(hr_data);
-            }
-            if (d.length == 3 && d[0] == "P") {
-                // we have PPG raw reading
-                var ppg_raw = {
-                    ms: parseInt(d[1]),
-                    raw: parseInt(d[2])
-                };
-                pPPGRaw.textContent = ppg_raw.raw;
+                // Update chart data
+                hrmData.time.push(hrm_data.ms);
+                hrmData.bpm.push(hrm_data.bpm);
+                hrmData.heartRate.push(calculateHeartRate(hrmData.bpm));
 
-                result.ppg.push(ppg_raw);
+                updateChart();
+                result.hrm.push(hrm_data);
             }
+        }
+
+        function updateChart() {
+            if (!hrmChart) {
+                hrmChart = new Chart(document.getElementById('hrmChart').getContext('2d'), {
+                    type: 'line',
+                    data: {
+                        labels: hrmData.time,
+                        datasets: [{
+                            label: 'BPM',
+                            data: hrmData.bpm,
+                            borderColor: 'rgb(75, 192, 192)',
+                            backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                            fill: false
+                        }, {
+                            label: 'Confidence',
+                            data: hrmData.confidence,
+                            borderColor: 'rgb(255, 99, 132)',
+                            backgroundColor: 'rgba(255, 99, 132, 0.2)',
+                            fill: false
+                        }, {
+                            label: 'Heart Rate',
+                            data: hrmData.heartRate,
+                            borderColor: 'rgb(54, 162, 235)',
+                            backgroundColor: 'rgba(54, 162, 235, 0.2)',
+                            fill: false
+                        }]
+                    },
+                    options: {
+                        scales: {
+                            x: {
+                                type: 'linear',
+                                position: 'bottom'
+                            },
+                            y: {
+                                beginAtZero: true
+                            }
+                        }
+                    }
+                });
+            } else {
+                hrmChart.data.labels = hrmData.time;
+                hrmChart.data.datasets[0].data = hrmData.bpm;
+                hrmChart.data.datasets[1].data = hrmData.confidence;
+                hrmChart.data.datasets[2].data = hrmData.heartRate;
+                hrmChart.update();
+            }
+        }
+
+        function calculateHeartRate(bpmData) {
+            if (bpmData.length === 0) return 0;
+            return bpmData.reduce((a, b) => a + b) / bpmData.length;
         }
     </script>
 </body>
