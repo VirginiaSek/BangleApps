@@ -73,7 +73,6 @@ Bangle.on('HRM-raw', function(hrm) {
         let hrmData = {
             time: [],
             bpm: [],
-            confidence: [],
             heartRate: []
         };
 
@@ -202,12 +201,6 @@ Bangle.on('HRM-raw', function(hrm) {
                             backgroundColor: 'rgba(75, 192, 192, 0.2)',
                             fill: false
                         }, {
-                            label: 'Confidence',
-                            data: hrmData.confidence,
-                            borderColor: 'rgb(255, 99, 132)',
-                            backgroundColor: 'rgba(255, 99, 132, 0.2)',
-                            fill: false
-                        }, {
                             label: 'Heart Rate',
                             data: hrmData.heartRate,
                             borderColor: 'rgb(54, 162, 235)',
@@ -230,8 +223,7 @@ Bangle.on('HRM-raw', function(hrm) {
             } else {
                 hrmChart.data.labels = hrmData.time;
                 hrmChart.data.datasets[0].data = hrmData.bpm;
-                hrmChart.data.datasets[1].data = hrmData.confidence;
-                hrmChart.data.datasets[2].data = hrmData.heartRate;
+                hrmChart.data.datasets[1].data = hrmData.heartRate;
                 hrmChart.update();
             }
         }
