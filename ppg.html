@@ -53,9 +53,7 @@ Bangle.on('HRM-raw', function(hrm) {
     "H",
     Date.now() - start,
     hrm.raw,
-    hrm.filt,
-    hrm.bpm,
-    hrm.confidence
+    hrm.bpm
   ];
   Bluetooth.println(d.join(","));
 });
@@ -75,7 +73,6 @@ Bangle.on('HRM-raw', function(hrm) {
         let hrmData = {
             time: [],
             bpm: [],
-            confidence: [],
             heartRate: []
         };
 
@@ -172,21 +169,18 @@ Bangle.on('HRM-raw', function(hrm) {
 
                 result.steps.push(steps);
             }
-            if (d.length == 6 && d[0] == "H") {
+            if (d.length == 4 && d[0] == "H") {
                 // we have an HR monitor reading
                 var hrm_data = {
                     ms: parseInt(d[1]),
                     raw: parseInt(d[2]),
-                    filt: parseInt(d[3]),
-                    bpm: parseFloat(d[4]),
-                    confidence: parseInt(d[5])
+                    bpm: parseFloat(d[3])
                 };
                 pHRMRaw.textContent = hrm_data.raw;
 
                 // Update chart data
                 hrmData.time.push(hrm_data.ms);
                 hrmData.bpm.push(hrm_data.bpm);
-                hrmData.confidence.push(hrm_data.confidence);
                 hrmData.heartRate.push(calculateHeartRate(hrmData.bpm));
 
                 updateChart();
@@ -205,12 +199,6 @@ Bangle.on('HRM-raw', function(hrm) {
                             data: hrmData.bpm,
                             borderColor: 'rgb(75, 192, 192)',
                             backgroundColor: 'rgba(75, 192, 192, 0.2)',
-                            fill: false
-                        }, {
-                            label: 'Confidence',
-                            data: hrmData.confidence,
-                            borderColor: 'rgb(255, 99, 132)',
-                            backgroundColor: 'rgba(255, 99, 132, 0.2)',
                             fill: false
                         }, {
                             label: 'Heart Rate',
@@ -235,8 +223,7 @@ Bangle.on('HRM-raw', function(hrm) {
             } else {
                 hrmChart.data.labels = hrmData.time;
                 hrmChart.data.datasets[0].data = hrmData.bpm;
-                hrmChart.data.datasets[1].data = hrmData.confidence;
-                hrmChart.data.datasets[2].data = hrmData.heartRate;
+                hrmChart.data.datasets[1].data = hrmData.heartRate;
                 hrmChart.update();
             }
         }
@@ -248,3 +235,4 @@ Bangle.on('HRM-raw', function(hrm) {
     </script>
 </body>
 </html>
+
