@@ -4,7 +4,6 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <link rel="stylesheet" href="https://cdn.rawgit.com/kimeiga/bahunya/css/bahunya-0.1.1.css" />
-    <script src="https://www.chartjs.org/dist/3.7.0/chart.min.js"></script>
 </head>
 <body>
     <script src="https://www.puck-js.com/puck.js"></script>
@@ -20,7 +19,6 @@
             <p>Steps: <span id="pSteps"></span></p>
             <p>Heart Rate: <span id="pHeartRate"></span></p>
             <p>HRM Raw: <span id="pHRMRaw"></span></p>
-            <canvas id="hrmChart" width="400" height="200"></canvas>
         </article>
     </main>
     <script>
@@ -71,12 +69,6 @@ Bangle.on('HRM-raw', function(hrm) {
         let pHRMRaw = document.getElementById("pHRMRaw");
 
         let result = {};
-        let hrmChart;
-        let hrmData = {
-            time: [],
-            bpm: [],
-            confidence: []
-        };
 
         // detect file saving capability
         try {
@@ -182,56 +174,9 @@ Bangle.on('HRM-raw', function(hrm) {
                 };
                 pHRMRaw.textContent = hrm_data.raw;
 
-                // Update chart data
-                hrmData.time.push(hrm_data.ms);
-                hrmData.bpm.push(hrm_data.bpm);
-                hrmData.confidence.push(hrm_data.confidence);
-
-                updateChart();
                 result.hrm.push(hrm_data);
-            }
-        }
-
-        function updateChart() {
-            if (!hrmChart) {
-                hrmChart = new Chart(document.getElementById('hrmChart').getContext('2d'), {
-                    type: 'line',
-                    data: {
-                        labels: hrmData.time,
-                        datasets: [{
-                            label: 'BPM',
-                            data: hrmData.bpm,
-                            borderColor: 'rgb(75, 192, 192)',
-                            backgroundColor: 'rgba(75, 192, 192, 0.2)',
-                            fill: false
-                        }, {
-                            label: 'Confidence',
-                            data: hrmData.confidence,
-                            borderColor: 'rgb(255, 99, 132)',
-                            backgroundColor: 'rgba(255, 99, 132, 0.2)',
-                            fill: false
-                        }]
-                    },
-                    options: {
-                        scales: {
-                            x: {
-                                type: 'linear',
-                                position: 'bottom'
-                            },
-                            y: {
-                                beginAtZero: true
-                            }
-                        }
-                    }
-                });
-            } else {
-                hrmChart.data.labels = hrmData.time;
-                hrmChart.data.datasets[0].data = hrmData.bpm;
-                hrmChart.data.datasets[1].data = hrmData.confidence;
-                hrmChart.update();
             }
         }
     </script>
 </body>
 </html>
-
