@@ -15,57 +15,12 @@
             <p>Heart Rate: <span id="pHeartRate"></span></p>
             <button id="btnDownload">Download Data</button>
         </article>
-        <!-- Aggiungi un div per il grafico -->
-        <div id="graph"></div>
         <!-- Aggiungi un div per visualizzare il valore dell'heart rate corrente -->
         <div id="currentHeartRate"></div>
     </main>
-    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
     <script>
         // Variabili globali per i dati dell'heart rate
         let heartRateData = [];
-
-        // Funzione per creare il grafico di streaming
-        function createStreamingGraph() {
-            // Configurazione del grafico
-            var layout = {
-                xaxis: {
-                    title: 'Time'
-                },
-                yaxis: {
-                    title: 'Heart Rate'
-                },
-                showlegend: false
-            };
-
-            var config = {
-                responsive: true
-            };
-
-            // Creazione del grafico vuoto
-            var graph = Plotly.newPlot('graph', [], layout, config);
-
-            // Funzione per aggiornare il grafico con i nuovi dati
-            function updateGraph(data) {
-                // Estrae i timestamp e i valori dell'heart rate dai dati
-                var timestamps = data.map(entry => new Date(entry.timestamp).getTime());
-                var heartRates = data.map(entry => entry.heartRate);
-
-                // Aggiorna il grafico
-                Plotly.relayout('graph', {
-                    xaxis: {
-                        range: [Math.min(...timestamps), Math.max(...timestamps)]
-                    }
-                });
-                Plotly.restyle('graph', {
-                    x: [timestamps],
-                    y: [heartRates]
-                });
-            }
-
-            // Richiama la funzione per aggiornare il grafico con i dati attuali
-            updateGraph(heartRateData);
-        }
 
         // Funzione per gestire i dati dell'heart rate ricevuti dalla Polar H10
         function handleHeartRateData(event) {
@@ -76,7 +31,6 @@
             heartRateData.push(dataEntry);
             document.getElementById("pHeartRate").textContent = heartRate;
             document.getElementById("currentHeartRate").textContent = "Current Heart Rate: " + heartRate + " bpm";
-            createStreamingGraph();
         }
 
         // Funzione per connettersi alla Polar H10
@@ -139,11 +93,6 @@
             a.click();
 
             URL.revokeObjectURL(url);
-        });
-
-        // Chiama la funzione per creare il grafico di streaming quando la pagina è completamente caricata
-        document.addEventListener('DOMContentLoaded', function() {
-            createStreamingGraph();
         });
     </script>
 </body>
