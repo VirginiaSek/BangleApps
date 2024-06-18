@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>Polar H10 Heart Rate Data Streaming</title>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="stylesheet" href="https://cdn.rawgit.com/kimeiga/bahunya/css/bahunya-0.1.1.css" />
+</head>
+<body>
+    <h2 style="text-align: center;">Polar H10 Heart Rate Data Streaming</h2>
+    <main>
+        <article>
+            <p id="pMain">Ready to connect</p>
+            <button id="btnConnect">Connect</button>
+            <p>Heart Rate: <span id="pHeartRate"></span></p>
+            <button id="btnDownload">Download Data</button>
+        </article>
+        <!-- Aggiungi un div per visualizzare il valore dell'heart rate corrente -->
+        <div id="currentHeartRate"></div>
+        <div id="errorMessage" style="color: red;"></div>
+    </main>
+    <script>
+        // Variabili globali per i dati dell'heart rate e per la connessione
+        let heartRateData = [];
+        let dataTimeout;
+        let device;
+        let characteristic;
+
+        // Funzione per gestire i dati dell'heart rate ricevuti dalla Polar H10
+        function handleHeartRateData(event) {
+            let value = event.target.value;
+            let heartRate = value.getUint8(1);
+            let timestamp = new Date().toISOString();
+            let dataEntry = { timestamp: timestamp, heartRate: heartRate };
+            heartRateData.push(dataEntry);
+            document.getElementById("pHeartRate").textContent = heartRate;
+            document.getElementById("currentHeartRate").textContent = "Current Heart Rate: " + heartRate + " bpm";
+
+            // Resetta il timeout ogni volta che si ricevono nuovi dati
+            clearTimeout(dataTimeout);
+            document.getElementById("errorMessage").textContent = ""; // Nascondi messaggio di errore
+            dataTimeout = setTimeout(function() {
+                document.getElementById("errorMessage").textContent = "Perdita dati";
+            }, 2000);
+        }
+
+        // Funzione per connettersi alla Polar H10
+        async function connectToPolarH10() {
+            try {
+                document.getElementById("pMain").textContent = 'Scanning for devices...';
+                device = await navigator.bluetooth.requestDevice({
+                    filters: [{ services: ['heart_rate'] }],
+                    optionalServices: ['heart_rate']
+                });
+                await device.gatt.connect();
+                document.getElementById("pMain").textContent = 'Connected!';
+                setupPolarH10Listener(device);
+            } catch (error) {
+                console.error('Error connecting to Polar H10:', error);
+                document.getElementById("pMain").textContent = 'Error connecting';
+            }
+        }
+
+        // Funzione per configurare il listener per i dati dell'heart rate dalla Polar H10
+        function setupPolarH10Listener(device) {
+            if (!device || !device.gatt.connected) {
+                console.error('Device not connected');
+                return;
+            }
+
+            device.gatt.getPrimaryService('heart_rate').then(service => {
+                service.getCharacteristic('heart_rate_measurement').then(char => {
+                    characteristic = char;
+                    characteristic.addEventListener('characteristicvaluechanged', handleHeartRateData);
+                    characteristic.startNotifications();
+                });
+            }).catch(error => {
+                console.error('Error setting up notifications:', error);
+            });
+        }
+
+        // Funzione per disconnettere il dispositivo
+        function disconnectPolarH10() {
+            if (device && device.gatt.connected) {
+                if (characteristic) {
+                    characteristic.removeEventListener('characteristicvaluechanged', handleHeartRateData);
+                }
+                device.gatt.disconnect();
+                document.getElementById("pMain").textContent = "Ready to connect";
+                document.getElementById("btnConnect").textContent = "Connect";
+                clearTimeout(dataTimeout);
+                document.getElementById("errorMessage").textContent = ""; // Nascondi messaggio di errore
+            }
+        }
+
+        // Gestione del click sul pulsante "Connect"
+        document.getElementById("btnConnect").addEventListener("click", function () {
+            if (document.getElementById("btnConnect").textContent === "Connect") {
+                connectToPolarH10();
+                document.getElementById("btnConnect").textContent = "Disconnect";
+            } else {
+                disconnectPolarH10();
+            }
+        });
+
+        // Gestione del click sul pulsante "Download Data"
+        document.getElementById("btnDownload").addEventListener('click', function () {
+            let json = JSON.stringify(heartRateData, null, 2);
+            let blob = new Blob([json], { type: 'application/json' });
+            let url = URL.createObjectURL(blob);
+
+            let a = document.createElement('a');
+            a.href = url;
+            a.download = 'heart_rate_data.json';
+            a.click();
+
+            URL.revokeObjectURL(url);
+        });
+    </script>
+</body>
+</html>
